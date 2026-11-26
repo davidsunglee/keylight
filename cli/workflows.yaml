@@ -1,0 +1,102 @@
+# Built-in workflows, steps and profiles.
+#
+# Override any of it in ~/.config/fathom/workflows.yaml: the same shape, merged
+# over this file one workflow, one step field and one profile entry at a time.
+
+default: design      # workflow for `fathom start` when none is named
+profile: default
+
+# A workflow is an ordered list of steps. Each step runs in a fresh session.
+workflows:
+  direct: [grill, worktree, implement-decisions, review, pr]
+  design: [research-questions, research, tdd, structure-outline, worktree, implement-outline, pr]
+  product: [research-questions, research, prd, tdd, structure-outline, worktree, implement-outline, pr]
+
+# Step fields:
+#   skill     the skill the session opens with
+#   run       a step done by code instead of a session (only `worktree`)
+#   session   headless: runs unattended to the end, then the next step starts
+#             interactive: you work in it; quitting it hands back to the runner
+#   in        checkout (default) or worktree: where the session runs
+#   produces  document kind the step must leave in the task folder
+#   phases    document kind whose phases must all be marked done
+#   check     shell command that must succeed (FATHOM_TASK, FATHOM_TASK_DIR,
+#             FATHOM_WORKTREE and FATHOM_BASE are set)
+#   prompt    text added to the opening message; {{ task }}, {{ dir }},
+#             {{ store }}, {{ worktree }}, {{ base }} and {{ skills }} are filled in
+#   confirm   false: continue after an interactive step without asking
+steps:
+  research-questions:
+    skill: create-research-questions
+    session: headless
+    produces: research-questions
+  research:
+    skill: create-research
+    session: headless
+    produces: research
+  prd:
+    skill: create-prd
+    session: interactive
+    produces: prd
+  tdd:
+    skill: create-tdd
+    session: interactive
+    produces: tdd
+  structure-outline:
+    skill: create-structure-outline
+    session: interactive
+    produces: structure-outline
+  grill:
+    skill: grilling
+    session: interactive
+    produces: decisions
+    prompt: |
+      Grill me about the task described in {{ dir }}/task.md.
+
+      This session runs in a terminal, which draws text only: when a question needs a Mermaid diagram or an HTML page, show it as {{ skills }}/fathom/SCRATCH.md describes.
+
+      When we have reached a shared understanding, write the decisions document to the path that `fathom task next decisions <description>` prints, following the template at {{ skills }}/implement-decisions/decisions-template.md. Then tell me it is written: quitting this session starts the implementation.
+  worktree:
+    run: worktree
+  implement-outline:
+    skill: implement-outline
+    session: interactive
+    in: worktree
+  implement-decisions:
+    skill: implement-decisions
+    session: headless
+    in: worktree
+    phases: decisions
+  review:
+    skill: review-loop
+    session: headless
+    in: worktree
+    prompt: |
+      Review the implementation of task {{ task }}.
+
+      - Worktree: {{ worktree }}
+      - Fixed point: {{ base }}
+      - Spec: the decisions document and task.md in {{ dir }}
+      - Standards: CODING_STANDARDS.md at the repository root, when it exists
+      - Artifact directory: {{ dir }}
+      - Boundary: implementation
+    check: >-
+      jq -e '.verdict == "clean"'
+      "$(ls -d "$FATHOM_TASK_DIR"/review-loop/implementation/round-* | sort | tail -1)/findings.json"
+  pr:
+    skill: describe-pr
+    session: headless
+    in: worktree
+    produces: pr-description
+
+# A profile says how each step's session is launched. "*" applies to every
+# step; a step's own entry overrides it field by field.
+#   harness      claude (default) or codex
+#   model        passed to the harness; omitted, the harness uses its own default
+#   effort       reasoning effort; omitted, the harness default
+#   permissions  claude: permission mode (headless default: auto)
+#                codex: sandbox mode (headless default: workspace-write)
+#   args         extra arguments passed to the harness as they are
+profiles:
+  default:
+    "*": { harness: claude }

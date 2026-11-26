@@ -1,0 +1,145 @@
+// Workflows, steps and profiles: what `fathom run` executes and how each
+// session is launched. Built-in definitions live in workflows.yaml beside this
+// file; <config>/workflows.yaml overrides them.
+
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+
+export interface Step {
+  skill?: string;
+  run?: "worktree";
+  session?: "headless" | "interactive";
+  in?: "checkout" | "worktree";
+  produces?: string;
+  phases?: string;
+  check?: string;
+  prompt?: string;
+  confirm?: boolean;
+}
+
+export interface Launch {
+  harness: "claude" | "codex";
+  model?: string;
+  effort?: string;
+  permissions?: string;
+  args?: string[];
+}
+
+export interface Workflows {
+  default: string;
+  profile: string;
+  workflows: Record<string, string[]>;
+  steps: Record<string, Step>;
+  profiles: Record<string, Record<string, Partial<Launch>>>;
+}
+
+export class ConfigError extends Error {}
+
+/** The skills shipped with fathom, for prompts that point at one of their files. */
+export const SKILLS_DIR = join(import.meta.dir, "..", "skills");
+
+type Dict = Record<string, unknown>;
+
+function isDict(value: unknown): value is Dict {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readYaml(path: string): Dict {
+  let data: unknown;
+  try {
+    data = Bun.YAML.parse(readFileSync(path, "utf8"));
+  } catch (err) {
+    throw new ConfigError(`${path}: ${(err as Error).message}`);
+  }
+  if (data == null) return {};
+  if (!isDict(data)) throw new ConfigError(`${path}: expected settings as "key: value" lines`);
+  return data;
+}
+
+function section(data: Dict, key: string, path: string): Dict {
+  const value = data[key];
+  if (value == null) return {};
+  if (!isDict(value)) throw new ConfigError(`${path}: "${key}" must hold named entries`);
+  return value;
+}
+
+/** Merge named entries, and the fields inside an entry, so an override can change one field. */
+function mergeEntries(base: Dict, over: Dict): Dict {
+  const out: Dict = { ...base };
+  for (const [name, value] of Object.entries(over)) {
+    out[name] = isDict(value) && isDict(base[name]) ? { ...(base[name] as Dict), ...value } : value;
+  }
+  return out;
+}
+
+export function loadWorkflows(configDir: string): Workflows {
+  const basePath = join(import.meta.dir, "workflows.yaml");
+  const userPath = join(configDir, "workflows.yaml");
+  const base = readYaml(basePath);
+  const user = existsSync(userPath) ? readYaml(userPath) : {};
+
+  const profiles = section(base, "profiles", basePath);
+  for (const [name, entries] of Object.entries(section(user, "profiles", userPath))) {
+    if (!isDict(entries)) throw new ConfigError(`${userPath}: profile "${name}" must map steps to settings`);
+    profiles[name] = mergeEntries(isDict(profiles[name]) ? (profiles[name] as Dict) : {}, entries);
+  }
+
+  const config = {
+    default: String(user.default ?? base.default),
+    profile: String(user.profile ?? base.profile),
+    workflows: { ...section(base, "workflows", basePath), ...section(user, "workflows", userPath) },
+    steps: mergeEntries(section(base, "steps", basePath), section(user, "steps", userPath)),
+    profiles,
+  } as Workflows;
+
+  const where = existsSync(userPath) ? userPath : basePath;
+  for (const [name, steps] of Object.entries(config.workflows)) {
+    if (!Array.isArray(steps) || !steps.length) throw new ConfigError(`${where}: workflow "${name}" must list its steps`);
+    for (const step of steps) {
+      if (!config.steps[step]) throw new ConfigError(`${where}: workflow "${name}" names an unknown step "${step}"`);
+    }
+  }
+  for (const [name, step] of Object.entries(config.steps)) {
+    if (!isDict(step)) throw new ConfigError(`${where}: step "${name}" must hold settings`);
+    if (!step.skill === !step.run) throw new ConfigError(`${where}: step "${name}" needs either "skill" or "run"`);
+    if (step.run && step.run !== "worktree") throw new ConfigError(`${where}: step "${name}": the only code step is "run: worktree"`);
+    if (step.skill && step.session !== "headless" && step.session !== "interactive") {
+      throw new ConfigError(`${where}: step "${name}" needs "session: headless" or "session: interactive"`);
+    }
+  }
+  workflowNamed(config, config.default);
+  profileNamed(config, config.profile);
+  return config;
+}
+
+export function workflowNamed(config: Workflows, name: string): string[] {
+  const steps = config.workflows[name];
+  if (!steps) throw new ConfigError(`no workflow named "${name}". Known: ${Object.keys(config.workflows).join(", ")}`);
+  return steps;
+}
+
+function profileNamed(config: Workflows, name: string): Record<string, Partial<Launch>> {
+  const profile = config.profiles[name];
+  if (!profile) throw new ConfigError(`no profile named "${name}". Known: ${Object.keys(config.profiles).join(", ")}`);
+  return profile;
+}
+
+/** How a step's session is launched under a profile. */
+export function launchFor(config: Workflows, profileName: string, step: string): Launch {
+  const profile = profileNamed(config, profileName);
+  const launch = { harness: "claude", ...profile["*"], ...profile[step] } as Launch;
+  if (launch.harness !== "claude" && launch.harness !== "codex") {
+    throw new ConfigError(`profile "${profileName}", step "${step}": harness must be claude or codex, not "${launch.harness}"`);
+  }
+  return launch;
+}
+
+/** Every document kind a step produces, longest first, to tell `research` from `research-questions`. */
+export function documentKinds(config: Workflows): string[] {
+  const kinds = new Set<string>();
+  for (const step of Object.values(config.steps)) {
+    if (step.produces) kinds.add(step.produces);
+    if (step.phases) kinds.add(step.phases);
+  }
+  return [...kinds].sort((a, b) => b.length - a.length);
+}

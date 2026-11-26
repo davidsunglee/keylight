@@ -1,0 +1,26 @@
+{
+  "name": "fathom",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A research, design, outline and implement workflow for coding agents, with a local artifact viewer.",
+  "bin": {
+    "fathom": "./cli/fathom.ts"
+  },
+  "scripts": {
+    "check": "tsc -p .",
+    "serve": "bun cli/fathom.ts serve",
+    "parity": "bun viewer/test/parity.ts",
+    "shot": "bun viewer/test/shot.ts"
+  },
+  "dependencies": {
+    "highlight.js": "11",
+    "markdown-it": "14",
+    "mermaid": "11"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.5",
+    "@types/markdown-it": "^14.2.0",
+    "playwright": "1"
+  }
+}

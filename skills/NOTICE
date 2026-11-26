@@ -1,0 +1,8 @@
+The workflow skills and sub-agent briefs in this directory are derived from
+HumanLayer's "rpi" Research-Plan-Implement plugin and its companion plugins
+(https://github.com/humanlayer/riptide-rpi), version 0.50.1, licensed under
+the Apache License, Version 2.0. See LICENSE.
+
+They have been modified: HumanLayer-specific paths, hooks, cloud links, and
+application references were replaced with fathom's task folders, command, and
+viewer, and shared guidance was moved into the `fathom` skill.

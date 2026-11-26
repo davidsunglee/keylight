@@ -1,0 +1,434 @@
+// fathom run: take a task through its workflow, one fresh session per step.
+//
+// The runner is a foreground loop. It starts each step's session as a child
+// process, waits for it to end, checks what the step was meant to leave
+// behind, and starts the next. Headless steps chain on their own; an
+// interactive step hands back when you quit its session.
+//
+// What cannot be read from the task's documents is kept in <task>/.fathom.json:
+// the workflow, the profile, where the work happens, and which steps are done.
+
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join, relative } from "node:path";
+import type { Config } from "./config";
+import { currentRepo, currentTask, LINK_DIR, storeOf, TaskError, type Repo } from "./task";
+import { documentKinds, launchFor, SKILLS_DIR, workflowNamed, type Launch, type Step, type Workflows } from "./workflow";
+import { setupWorktree } from "./worktree";
+
+interface StepState {
+  status: "started" | "done";
+  at: string;
+  harness?: string;
+  /** Claude Code session, so an interrupted interactive step can be resumed. */
+  session?: string;
+}
+
+export interface State {
+  workflow: string;
+  profile: string;
+  /** Checkout the design steps run in. */
+  checkout: string;
+  /** Checkout the implementation steps run in, once the worktree step has run. */
+  worktree?: string;
+  /** Commit the implementation started from. */
+  base?: string;
+  steps: Record<string, StepState>;
+}
+
+export interface RunOptions {
+  named?: string;
+  workflow?: string;
+  profile?: string;
+  from?: string;
+  until?: string;
+  dryRun?: boolean;
+}
+
+const STATE_FILE = ".fathom.json";
+const dim = (text: string) => (process.stdout.isTTY ? `\x1b[2m${text}\x1b[0m` : text);
+const bold = (text: string) => (process.stdout.isTTY ? `\x1b[1m${text}\x1b[0m` : text);
+
+// ---------------------------------------------------------------- state
+
+export function readState(store: string): State | null {
+  const file = join(store, STATE_FILE);
+  return existsSync(file) ? (JSON.parse(readFileSync(file, "utf8")) as State) : null;
+}
+
+function writeState(store: string, state: State) {
+  writeFileSync(join(store, STATE_FILE), `${JSON.stringify(state, null, 2)}\n`);
+}
+
+/** State for a task that has none yet. Steps whose documents already exist count as done. */
+export function initState(store: string, checkout: string, workflows: Workflows, workflow: string, profile: string, save = true): State {
+  const state: State = { workflow, profile, checkout, steps: {} };
+  for (const name of workflowNamed(workflows, workflow)) {
+    const step = workflows.steps[name]!;
+    if (!step.produces || !findDocument(store, step.produces, workflows)) break;
+    state.steps[name] = { status: "done", at: new Date().toISOString() };
+  }
+  if (save) writeState(store, state);
+  return state;
+}
+
+/** Note the task's worktree, when the task has a workflow under way. */
+export function recordWorktree(store: string, worktree: { path: string; base: string }, workflows: Workflows) {
+  const state = readState(store);
+  if (!state) return;
+  state.worktree = worktree.path;
+  state.base = worktree.base;
+  for (const name of workflowNamed(workflows, state.workflow)) {
+    if (workflows.steps[name]?.run === "worktree") state.steps[name] = { status: "done", at: new Date().toISOString() };
+  }
+  writeState(store, state);
+}
+
+// ---------------------------------------------------------------- documents
+
+/** The newest document of a kind in the task folder: `NN-<kind>-<slug>.md`, or `<kind>.md`. */
+export function findDocument(store: string, kind: string, workflows: Workflows): string | null {
+  const kinds = documentKinds(workflows);
+  const matches = readdirSync(store)
+    .filter((file) => {
+      if (file === `${kind}.md`) return true;
+      const rest = /^\d+-(.+)\.md$/.exec(file)?.[1];
+      // `research-questions-x` is not a `research` document: the longest kind wins.
+      return rest !== undefined && kinds.find((k) => rest.startsWith(`${k}-`)) === kind;
+    })
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  return matches.at(-1) ?? null;
+}
+
+/** Phase headings in a document: how many there are and how many are marked done. */
+export function phaseProgress(document: string): { total: number; done: number } {
+  // A heading shown inside a code block is an example, not a phase.
+  const text = document.replace(/^(`{3,}|~{3,}).*\n[\s\S]*?^\1.*$/gm, "");
+  const headings = text.match(/^#{2,4}\s+(?:✅\s*)?Phase\s+\d+.*$/gm) ?? [];
+  return { total: headings.length, done: headings.filter((h) => h.includes("✅")).length };
+}
+
+// ---------------------------------------------------------------- prompts
+
+function fill(template: string, values: Record<string, string>): string {
+  return template.replace(/\{\{\s*(\w+)\s*\}\}/g, (whole, key: string) => values[key] ?? whole);
+}
+
+/** Text of the first of these files that exists. */
+function firstFile(paths: string[]): string | null {
+  const found = paths.find((path) => existsSync(path));
+  return found ? readFileSync(found, "utf8").trim() : null;
+}
+
+/**
+ * A prompt kept in a file: the repository's copy wins over the personal one.
+ *   <repo>/.fathom/prompts/<name>.md, then <config>/prompts/<name>.md
+ */
+function promptFile(name: string, cwd: string, config: Config): string | null {
+  return firstFile([join(cwd, ".fathom", "prompts", `${name}.md`), join(config.configDir, "prompts", `${name}.md`)]);
+}
+
+/**
+ * The message for a point inside a step, e.g. the end of the TDD's system
+ * design. Falls back to the copy shipped with the step's skill.
+ */
+export function gatePrompt(stepName: string, gate: string, cwd: string, config: Config, workflows: Workflows): string {
+  const skill = workflows.steps[stepName]?.skill;
+  const text =
+    promptFile(`${stepName}.${gate}`, cwd, config) ?? (skill ? firstFile([join(SKILLS_DIR, skill, `gate-${gate}.md`)]) : null);
+  if (text === null) throw new TaskError(`no prompt for gate "${gate}" of step "${stepName}"`);
+  return text;
+}
+
+const UNATTENDED =
+  "Nobody is watching this session. Finish the skill without asking questions; where it tells you to wait for the user, stop and say why.";
+
+function openingMessage(name: string, step: Step, launch: Launch, cwd: string, config: Config, values: Record<string, string>): string {
+  const parts = [launch.harness === "claude" ? `/${step.skill}` : `Run the \`${step.skill}\` skill.`];
+  if (step.prompt) parts.push(fill(step.prompt.trim(), values));
+  const added = promptFile(name, cwd, config);
+  if (added) parts.push(added);
+  if (step.session === "headless") parts.push(UNATTENDED);
+  return parts.join("\n\n");
+}
+
+// ---------------------------------------------------------------- sessions
+
+interface Session {
+  argv: string[];
+  /** Claude Code session id, when the harness lets us choose one. */
+  id?: string;
+}
+
+function sessionCommand(name: string, step: Step, launch: Launch, message: string, task: string, store: string, resume?: string): Session {
+  const headless = step.session === "headless";
+  const extra = launch.args ?? [];
+  if (launch.harness === "claude") {
+    const id = resume ?? crypto.randomUUID();
+    // The message comes first: --add-dir takes several values and would swallow it.
+    const argv = resume ? ["claude", "--resume", resume] : ["claude", ...(headless ? ["-p"] : []), message, "--session-id", id];
+    if (headless) argv.push("--output-format", "stream-json", "--verbose");
+    const permissions = launch.permissions ?? (headless ? "auto" : undefined);
+    if (permissions) argv.push("--permission-mode", permissions);
+    if (launch.model) argv.push("--model", launch.model);
+    if (launch.effort) argv.push("--effort", launch.effort);
+    if (!resume) argv.push("--name", `${task} · ${name}`);
+    argv.push(...extra, "--add-dir", store);
+    return { argv, id };
+  }
+  const argv = headless ? ["codex", "exec"] : ["codex"];
+  if (launch.model) argv.push("-m", launch.model);
+  if (launch.effort) argv.push("-c", `model_reasoning_effort="${launch.effort}"`);
+  const sandbox = launch.permissions ?? (headless ? "workspace-write" : undefined);
+  if (sandbox) argv.push("-s", sandbox);
+  argv.push("--add-dir", store, ...extra, message);
+  return { argv };
+}
+
+function shellQuote(argv: string[]): string {
+  return argv.map((arg) => (/^[\w@%+=:,./-]+$/.test(arg) ? arg : `'${arg.replace(/'/g, `'\\''`)}'`)).join(" ");
+}
+
+/** One line for a tool call in a headless Claude Code session. */
+function toolLine(name: string, input: Record<string, unknown>): string {
+  const detail = input.description ?? input.command ?? input.file_path ?? input.pattern ?? input.skill ?? input.prompt ?? "";
+  return `  ${name}  ${String(detail).split("\n")[0]!.slice(0, 110)}`;
+}
+
+/** Run a headless Claude Code session, showing its messages and tool calls as they happen. */
+async function runClaudeHeadless(argv: string[], cwd: string, env: Record<string, string>, log: string): Promise<{ ok: boolean; why?: string }> {
+  const child = Bun.spawn(argv, { cwd, env, stdin: "ignore", stdout: "pipe", stderr: "inherit" });
+  const raw = Bun.file(log).writer();
+  let failed: string | undefined;
+  let finished = false;
+  let buffer = "";
+  const decoder = new TextDecoder();
+  for await (const chunk of child.stdout) {
+    raw.write(chunk);
+    buffer += decoder.decode(chunk, { stream: true });
+    let end: number;
+    while ((end = buffer.indexOf("\n")) !== -1) {
+      const line = buffer.slice(0, end);
+      buffer = buffer.slice(end + 1);
+      let event: any;
+      try {
+        event = JSON.parse(line);
+      } catch {
+        continue;
+      }
+      if (event.type === "assistant" && !event.parent_tool_use_id) {
+        for (const block of event.message?.content ?? []) {
+          if (block.type === "text" && block.text.trim()) console.log(`\n${block.text.trim()}`);
+          if (block.type === "tool_use") console.log(dim(toolLine(block.name, block.input ?? {})));
+        }
+      }
+      if (event.type === "result") {
+        finished = true;
+        if (event.is_error) failed = String(event.result ?? event.subtype ?? "the session reported an error");
+      }
+    }
+  }
+  await raw.end();
+  const code = await child.exited;
+  if (failed) return { ok: false, why: failed };
+  if (code !== 0) return { ok: false, why: `the session exited with status ${code}` };
+  if (!finished) return { ok: false, why: "the session ended without a result" };
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------- the loop
+
+interface Context {
+  repo: Repo;
+  task: string;
+  store: string;
+  config: Config;
+  workflows: Workflows;
+  state: State;
+}
+
+/** What a step should have left behind. Returns the problem, or null when it is all there. */
+function unmet(step: Step, ctx: Context, cwd: string): string | null {
+  if (step.produces && !findDocument(ctx.store, step.produces, ctx.workflows)) {
+    return `no ${step.produces} document was written to the task folder`;
+  }
+  if (step.phases) {
+    const doc = findDocument(ctx.store, step.phases, ctx.workflows);
+    if (!doc) return `there is no ${step.phases} document`;
+    const { total, done } = phaseProgress(readFileSync(join(ctx.store, doc), "utf8"));
+    if (!total) return `${doc} has no phases`;
+    if (done < total) return `${done} of ${total} phases are marked done in ${doc}`;
+  }
+  if (step.check) {
+    const result = Bun.spawnSync(["sh", "-c", step.check], { cwd, env: stepEnv(ctx), stdout: "ignore", stderr: "pipe" });
+    if (result.exitCode !== 0) return `its check did not pass${result.stderr.length ? `: ${result.stderr.toString().trim().split("\n").at(-1)}` : ""}`;
+  }
+  return null;
+}
+
+function stepEnv(ctx: Context, name?: string): Record<string, string> {
+  const env: Record<string, string> = { ...(process.env as Record<string, string>), FATHOM_TASK: ctx.task, FATHOM_TASK_DIR: ctx.store };
+  if (name) env.FATHOM_STEP = name;
+  if (ctx.state.worktree) env.FATHOM_WORKTREE = ctx.state.worktree;
+  if (ctx.state.base) env.FATHOM_BASE = ctx.state.base;
+  return env;
+}
+
+function describe(step: Step, launch: Launch): string {
+  if (step.run) return "code";
+  return [launch.harness, launch.model, launch.effort, step.session].filter(Boolean).join(" · ");
+}
+
+function logFile(ctx: Context, name: string): string {
+  const dir = join(homedir(), ".fathom", "logs", ctx.repo.name, ctx.task);
+  mkdirSync(dir, { recursive: true });
+  return join(dir, `${name}-${new Date().toISOString().replace(/[:.]/g, "-")}.jsonl`);
+}
+
+/** Run one step. Returns null when it completed, or why it did not. */
+async function runStep(name: string, ctx: Context, dryRun: boolean): Promise<string | null> {
+  const { state, workflows, config } = ctx;
+  const step = workflows.steps[name]!;
+  const mark = (status: StepState["status"], more: Partial<StepState> = {}) => {
+    state.steps[name] = { ...state.steps[name], ...more, status, at: new Date().toISOString() };
+    writeState(ctx.store, state);
+  };
+
+  if (step.run === "worktree") {
+    console.log(`\n${bold(`▸ ${name}`)}  ${dim("code")}`);
+    if (dryRun) return null;
+    const worktree = setupWorktree(currentRepo(state.checkout), config, ctx.task);
+    for (const note of worktree.notes) console.log(`  ${note}`);
+    state.worktree = worktree.path;
+    state.base = worktree.base;
+    mark("done");
+    return null;
+  }
+
+  const launch = launchFor(workflows, state.profile, name);
+  const inWorktree = step.in === "worktree";
+  if (inWorktree && !state.worktree && !dryRun) return `it runs in the task's worktree, and the worktree step has not run`;
+  const cwd = inWorktree ? (state.worktree ?? "<worktree>") : state.checkout;
+  const values = {
+    task: ctx.task,
+    dir: join(LINK_DIR, ctx.task),
+    store: ctx.store,
+    worktree: state.worktree ?? "<worktree>",
+    base: state.base ?? "<starting commit>",
+    skills: SKILLS_DIR,
+  };
+  const previous = state.steps[name];
+  const resume = step.session === "interactive" && previous?.status === "started" ? previous.session : undefined;
+  const message = openingMessage(name, step, launch, existsSync(cwd) ? cwd : state.checkout, config, values);
+  const session = sessionCommand(name, step, launch, message, ctx.task, ctx.store, resume);
+
+  console.log(`\n${bold(`▸ ${name}`)}  ${dim(describe(step, launch) + (resume ? " · resuming" : ""))}`);
+  if (dryRun) {
+    console.log(dim(`  in ${cwd}`));
+    console.log(`  ${shellQuote(session.argv)}`);
+    return null;
+  }
+
+  mark("started", { harness: launch.harness, session: session.id });
+  const env = stepEnv(ctx, name);
+  if (step.session === "headless" && launch.harness === "claude") {
+    const log = logFile(ctx, name);
+    const result = await runClaudeHeadless(session.argv, cwd, env, log);
+    if (!result.ok) return `${result.why}\n  Full log: ${log}\n  Look into it:  cd ${cwd} && claude --resume ${session.id}`;
+  } else {
+    const headless = step.session === "headless";
+    const child = Bun.spawn(session.argv, { cwd, env, stdio: [headless ? "ignore" : "inherit", "inherit", "inherit"] });
+    const code = await child.exited;
+    if (headless && code !== 0) return `the session exited with status ${code}`;
+  }
+
+  const problem = unmet(step, ctx, cwd);
+  if (problem) return problem;
+  mark("done");
+  return null;
+}
+
+function context(config: Config, workflows: Workflows, options: RunOptions): Context {
+  const repo = currentRepo();
+  const task = currentTask(repo, options.named);
+  const store = storeOf(repo, config, task);
+  let state = readState(store);
+  if (!state) {
+    state = initState(store, repo.worktree, workflows, options.workflow ?? workflows.default, options.profile ?? workflows.profile, !options.dryRun);
+  } else if (options.workflow || options.profile) {
+    if (options.workflow) workflowNamed(workflows, options.workflow);
+    state.workflow = options.workflow ?? state.workflow;
+    state.profile = options.profile ?? state.profile;
+    if (!options.dryRun) writeState(store, state);
+  }
+  return { repo, task, store, config, workflows, state };
+}
+
+export async function runWorkflow(config: Config, workflows: Workflows, options: RunOptions): Promise<number> {
+  const ctx = context(config, workflows, options);
+  const steps = workflowNamed(workflows, ctx.state.workflow);
+  for (const flagged of [options.from, options.until]) {
+    if (flagged && !steps.includes(flagged)) throw new TaskError(`"${flagged}" is not a step of the ${ctx.state.workflow} workflow (${steps.join(", ")})`);
+  }
+  let index = options.from ? steps.indexOf(options.from) : steps.findIndex((name) => ctx.state.steps[name]?.status !== "done");
+  if (index === -1) {
+    console.log(`Every step of ${ctx.state.workflow} is done for ${ctx.task}.`);
+    return 0;
+  }
+  const last = options.until ? steps.indexOf(options.until) : steps.length - 1;
+  console.log(`${bold(ctx.task)}  ${dim(`${ctx.state.workflow} workflow · ${ctx.state.profile} profile`)}`);
+
+  for (; index <= last; index++) {
+    const name = steps[index]!;
+    const problem = await runStep(name, ctx, options.dryRun ?? false);
+    if (problem) {
+      console.error(`\nfathom: ${name} is not finished: ${problem}\nContinue from this step:  fathom run`);
+      return 1;
+    }
+    const next = steps[index + 1];
+    const step = workflows.steps[name]!;
+    if (options.dryRun || !next || index === last) continue;
+    if (step.session === "interactive" && step.confirm !== false && process.stdin.isTTY) {
+      const answer = prompt(`\n${name} is done. Enter starts ${next}; q stops here:`);
+      if (answer === null || answer.trim().toLowerCase().startsWith("q")) {
+        console.log(`Stopped before ${next}. Continue:  fathom run`);
+        return 0;
+      }
+    }
+  }
+  if (!options.dryRun) console.log(`\n${last === steps.length - 1 ? `${ctx.task}: the ${ctx.state.workflow} workflow is complete.` : `Stopped after ${steps[last]}.`}`);
+  return 0;
+}
+
+export function printStatus(config: Config, workflows: Workflows, named: string | undefined): number {
+  const repo = currentRepo();
+  const task = currentTask(repo, named);
+  const store = storeOf(repo, config, task);
+  const state = readState(store);
+  console.log(`task      ${task}`);
+  if (!state) {
+    console.log(`workflow  (not started)  Start it:  fathom run [--workflow NAME]`);
+    return 0;
+  }
+  console.log(`workflow  ${state.workflow}  (profile ${state.profile})`);
+  if (state.worktree) console.log(`worktree  ${state.worktree}`);
+  const steps = workflowNamed(workflows, state.workflow);
+  const width = Math.max(...steps.map((name) => name.length));
+  let nextShown = false;
+  for (const name of steps) {
+    const step = workflows.steps[name]!;
+    const status = state.steps[name]?.status;
+    const kind = step.produces ?? step.phases;
+    const doc = kind ? findDocument(store, kind, workflows) : null;
+    let note = doc ?? "";
+    if (step.phases && doc) {
+      const { total, done } = phaseProgress(readFileSync(join(store, doc), "utf8"));
+      if (total) note = `${doc}  ${done}/${total} phases`;
+    }
+    const symbol = status === "done" ? "✓" : status === "started" || !nextShown ? "▸" : "·";
+    if (status !== "done") nextShown = true;
+    console.log(`  ${symbol} ${name.padEnd(width)}  ${status === "done" || status === "started" ? note : dim(describe(step, step.run ? ({} as Launch) : launchFor(workflows, state.profile, name)))}`);
+  }
+  console.log(`store     ${relative(process.cwd(), store) || "."}`);
+  return 0;
+}
