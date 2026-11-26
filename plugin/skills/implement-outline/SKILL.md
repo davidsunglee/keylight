@@ -77,6 +77,7 @@ Ask for the human to:
 ### 4. Commit the Changes
 
 - Create a new commit for the changes
+- Stage only the files the phase changed, and follow the repository's commit instructions: its `AGENTS.md` or `CLAUDE.md`, and the style of `git log --oneline -5`
 - Task documents live outside the repository and git ignores `.artifacts/`, so they stay out of the commit
 
 ### 5. Review, when the user wants it
@@ -143,7 +144,7 @@ When ALL phases are complete and verified:
 
 ### Next Steps
 
-To create a PR, start a new session and run the `describe-pr` skill.
+To create a PR, start a new session and run the `fathom:describe-pr` skill.
 
 ---
 

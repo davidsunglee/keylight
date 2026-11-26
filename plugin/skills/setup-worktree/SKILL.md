@@ -17,5 +17,5 @@ When it succeeds, respond with exactly this, filling in the path from the `workt
 ```markdown
 Worktree for [task] is ready at [path], with the task folder linked.
 
-To implement, start a new session in that directory and run the `implement-outline` skill, or run `fathom run` to continue the task's workflow.
+To implement, start a new session in that directory and run the `fathom:implement-outline` skill, or run `fathom run` to continue the task's workflow.
 ```

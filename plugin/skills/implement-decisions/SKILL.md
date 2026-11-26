@@ -35,7 +35,7 @@ For each phase whose heading has no ✅, in order:
 
 1. Implement the phase.
 2. Run its check and the repository's own verification (tests, types, lint).
-3. Commit the phase as one commit whose message names it. Task documents live outside the repository and git ignores `.artifacts/`, so they stay out of the commit.
+3. Commit the phase as one commit. Stage only the files the phase changed, and follow the repository's commit instructions: its `AGENTS.md` or `CLAUDE.md`, and the style of `git log --oneline -5`. Task documents live outside the repository and git ignores `.artifacts/`, so they stay out of the commit.
 4. Mark the heading: `### Phase N: Title` → `### ✅ Phase N: Title`.
 
 Done when every phase heading carries ✅ and `git status --short` is empty.

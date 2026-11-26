@@ -19,7 +19,7 @@ ticket: [ENG-XXXX, or leave this line out]
 
 ## Phases
 
-[Fill this in only when phases were agreed in the conversation, one heading per phase in the format below. Otherwise leave the section empty: `implement-decisions` writes the phases before it starts.]
+[Fill this in only when phases were agreed in the conversation, one heading per phase in the format below. Otherwise leave the section empty: `fathom:implement-decisions` writes the phases before it starts.]
 
 ### Phase 1: [Title]
 

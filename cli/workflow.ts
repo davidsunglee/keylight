@@ -36,7 +36,7 @@ export interface Workflows {
 export class ConfigError extends Error {}
 
 /** The skills shipped with fathom, for prompts that point at one of their files. */
-export const SKILLS_DIR = join(import.meta.dir, "..", "skills");
+export const SKILLS_DIR = join(import.meta.dir, "..", "plugin", "skills");
 
 type Dict = Record<string, unknown>;
 

@@ -2,8 +2,8 @@ Check whether you are already in a worktree: run `git rev-parse --git-dir`; you 
 
 Then respond with exactly the text in the block below. Replace `<link>` with the link that `fathom url <path>` prints for the outline, and `<next step>` with the sentence that applies:
 
-- **In a worktree:** You're already in a worktree, so once you're happy with the approach we can go straight to implementation: start a new session and run the `implement-outline` skill.
-- **Otherwise:** Once you're happy with the approach, set up a worktree: start a new session and run the `setup-worktree` skill.
+- **In a worktree:** You're already in a worktree, so once you're happy with the approach we can go straight to implementation: start a new session and run the `fathom:implement-outline` skill.
+- **Otherwise:** Once you're happy with the approach, set up a worktree: start a new session and run the `fathom:setup-worktree` skill.
 
 ```markdown
 ## Next Steps

@@ -11,14 +11,16 @@ and the artifact viewer.
 fathom/
 ├── cli/        # the `fathom` command: workflow runner, task folders, viewer links
 ├── viewer/     # local artifact viewer
-└── skills/     # workflow skills, one directory per skill
-    ├── fathom/     # shared: task-folder conventions, sub-agent briefs,
-    │               # HTML artifact template; also `/fathom`, the overview
-    ├── show-me/    # visual conventions, used by other skills and on its own
-    ├── create-*/   # one per stage, each with its template and final answer
-    ├── iterate-*/  # revise a stage's document in place
-    ├── setup-worktree/  implement-outline/  implement-decisions/  describe-pr/
-    └── LICENSE, NOTICE  # the skills derive from HumanLayer's Apache-2.0 plugin
+└── plugin/     # the `fathom` plugin, installed in Claude Code and Codex
+    ├── .claude-plugin/  .codex-plugin/   # one manifest per tool
+    ├── LICENSE, NOTICE  # the skills derive from HumanLayer's Apache-2.0 plugin
+    └── skills/          # workflow skills, one directory per skill
+        ├── fathom/     # shared: task-folder conventions, sub-agent briefs,
+        │               # HTML artifact template; also the overview skill
+        ├── show-me/    # visual conventions, used by other skills and on its own
+        ├── create-*/   # one per stage, each with its template and final answer
+        ├── iterate-*/  # revise a stage's document in place
+        └── setup-worktree/  implement-outline/  implement-decisions/  describe-pr/
 ```
 
 Everything shares one contract: the task folder below. Skills write into it,
@@ -140,7 +142,8 @@ you delivered at that moment. The default text ships with each skill as
 | `structure-outline` | `review` | the outline has been written, or `iterate-structure-outline` changed it |
 
 A `create-` skill and its `iterate-` skill share one gate text. The TDD's
-lenses and gates are defined once, in `skills/create-tdd/lenses-and-gates.md`.
+lenses and gates are defined once, in
+`plugin/skills/create-tdd/lenses-and-gates.md`.
 
 ### Diagrams in a terminal session
 
@@ -156,7 +159,7 @@ fathom scratch                # just the link, to open before a session
 
 Keep the page open beside the session; it reloads as entries arrive, newest
 first. Text shapes (call trees, file trees, diffs, pseudocode) stay in the
-message. The rule lives in `skills/fathom/SCRATCH.md` and is referenced by
+message. The rule lives in `plugin/skills/fathom/SCRATCH.md` and is referenced by
 `show-me`, `create-tdd`, `iterate-tdd`, `create-prd`, `iterate-prd` and the
 `grill` step. Later stages skip `scratch.md` when they read the task folder.
 With no task linked, the page goes to `<root>/<repo>/scratch/`.
@@ -182,8 +185,10 @@ against the same file, so design and review share one source.
 | Implementation, direct | `implement-decisions` (from a decisions document) |
 | Pull request | `describe-pr` |
 
-Each document has an `iterate-` skill. `/fathom` shows this table and where
-the current task stands. Workflow skills run only when invoked by name.
+The skills are one plugin, so every name carries its prefix: `/fathom:create-tdd`
+in Claude Code, `fathom:create-tdd` in Codex. Each document has an `iterate-`
+skill. `fathom:fathom` shows this table and where the current task stands. In
+Claude Code the workflow skills run only when invoked by name.
 
 **One definition, referenced.** Anything two skills need lives once and is
 reached by a relative link: `../fathom/TASKS.md` (task folders, document
@@ -191,7 +196,7 @@ naming, formatting rules), `../fathom/SUBAGENTS.md` and `../fathom/agents/`
 (sub-agent briefs), `../fathom/HTML-ARTIFACTS.md` (HTML pages and their
 template), `../show-me/SKILL.md` (visual conventions). An `iterate-` skill
 reuses its `create-` skill's final answer. The links resolve because the
-skills install as sibling directories, so install them together.
+plugin keeps the skills as sibling directories.
 
 **Sub-agents are briefs, not named agents.** A skill dispatches a
 general-purpose sub-agent and tells it to read a brief by path. Nothing is
@@ -200,9 +205,29 @@ registered with Claude Code or Codex, and the same brief works in both.
 ### Install
 
 ```sh
-bun install && bun link         # puts `fathom` on PATH (needs ~/.bun/bin in PATH)
-npx skills add <this repo> -g   # or symlink skills/* into ~/.agents/skills while iterating
+bun install
+
+# The command: a wrapper in any directory on PATH.
+printf '#!/bin/sh\nexec bun %s/cli/fathom.ts "$@"\n' "$PWD" > ~/.local/bin/fathom
+chmod +x ~/.local/bin/fathom
+
+# Claude Code: one link. The plugin loads from the repository, so edits apply
+# to the next session.
+ln -s "$PWD/plugin" ~/.claude/skills/fathom
+
+# Codex: register the repository as a marketplace, then install from it.
+codex plugin marketplace add "$PWD"
+codex plugin add fathom@fathom
 ```
+
+Codex installs a copy of `plugin/`. After changing a skill, refresh the copy:
+
+```sh
+codex plugin remove fathom@fathom && codex plugin add fathom@fathom
+```
+
+`claude plugin disable fathom@skills-dir` and `codex plugin remove fathom@fathom`
+turn the plugin off without touching the repository.
 
 The agent must be able to write to the artifact root, which is outside the
 worktree:

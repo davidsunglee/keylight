@@ -1,0 +1,9 @@
+{
+  "name": "fathom",
+  "description": "Research, design, outline and implement workflow skills built around rich design artifacts on local disk.",
+  "version": "0.1.0",
+  "author": {
+    "name": "David Lee"
+  },
+  "license": "Apache-2.0"
+}

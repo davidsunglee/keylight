@@ -14,16 +14,16 @@ Three workflows string the stages together, and `fathom run` takes a task throug
 
 | Stage | Skill | Produces |
 | --- | --- | --- |
-| Research questions | `create-research-questions` | What the research must find out |
-| Research | `create-research` | How the codebase works today |
-| Product requirements (optional) | `create-prd` | What to build and why |
-| Technical design | `create-tdd` | How to build it, settled through an interview |
-| Structure outline | `create-structure-outline` | The work as thin, verifiable phases |
-| Worktree | `setup-worktree` | An isolated checkout linked to the task |
-| Implementation | `implement-outline` | The code, one phase at a time |
-| Implementation, direct | `implement-decisions` | The code, straight from a decisions document |
-| Pull request | `describe-pr` | The PR description |
+| Research questions | `fathom:create-research-questions` | What the research must find out |
+| Research | `fathom:create-research` | How the codebase works today |
+| Product requirements (optional) | `fathom:create-prd` | What to build and why |
+| Technical design | `fathom:create-tdd` | How to build it, settled through an interview |
+| Structure outline | `fathom:create-structure-outline` | The work as thin, verifiable phases |
+| Worktree | `fathom:setup-worktree` | An isolated checkout linked to the task |
+| Implementation | `fathom:implement-outline` | The code, one phase at a time |
+| Implementation, direct | `fathom:implement-decisions` | The code, straight from a decisions document |
+| Pull request | `fathom:describe-pr` | The PR description |
 
-Each document has an `iterate-` skill (`iterate-tdd`, `iterate-research`, …) that revises it in place. `show-me` explains anything visually along the way.
+Each document has an `iterate-` skill (`fathom:iterate-tdd`, `fathom:iterate-research`, …) that revises it in place. `fathom:show-me` explains anything visually along the way.
 
 Start by running `fathom status` to see where the current task stands in its workflow, then tell the user which stage comes next: `fathom run` starts it, or they can run the stage's skill by hand.

@@ -125,9 +125,10 @@ function promptFile(name: string, cwd: string, config: Config): string | null {
  * design. Falls back to the copy shipped with the step's skill.
  */
 export function gatePrompt(stepName: string, gate: string, cwd: string, config: Config, workflows: Workflows): string {
-  const skill = workflows.steps[stepName]?.skill;
+  // A fathom skill is named `fathom:<folder>`; other plugins' skills ship no gate text here.
+  const folder = workflows.steps[stepName]?.skill?.replace(/^fathom:/, "");
   const text =
-    promptFile(`${stepName}.${gate}`, cwd, config) ?? (skill ? firstFile([join(SKILLS_DIR, skill, `gate-${gate}.md`)]) : null);
+    promptFile(`${stepName}.${gate}`, cwd, config) ?? (folder ? firstFile([join(SKILLS_DIR, folder, `gate-${gate}.md`)]) : null);
   if (text === null) throw new TaskError(`no prompt for gate "${gate}" of step "${stepName}"`);
   return text;
 }

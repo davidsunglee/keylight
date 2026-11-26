@@ -13,7 +13,7 @@ workflows:
   product: [research-questions, research, prd, tdd, structure-outline, worktree, implement-outline, pr]
 
 # Step fields:
-#   skill     the skill the session opens with
+#   skill     the skill the session opens with; fathom's own are fathom:<name>
 #   run       a step done by code instead of a session (only `worktree`)
 #   session   headless: runs unattended to the end, then the next step starts
 #             interactive: you work in it; quitting it hands back to the runner
@@ -27,23 +27,23 @@ workflows:
 #   confirm   false: continue after an interactive step without asking
 steps:
   research-questions:
-    skill: create-research-questions
+    skill: fathom:create-research-questions
     session: headless
     produces: research-questions
   research:
-    skill: create-research
+    skill: fathom:create-research
     session: headless
     produces: research
   prd:
-    skill: create-prd
+    skill: fathom:create-prd
     session: interactive
     produces: prd
   tdd:
-    skill: create-tdd
+    skill: fathom:create-tdd
     session: interactive
     produces: tdd
   structure-outline:
-    skill: create-structure-outline
+    skill: fathom:create-structure-outline
     session: interactive
     produces: structure-outline
   grill:
@@ -59,11 +59,11 @@ steps:
   worktree:
     run: worktree
   implement-outline:
-    skill: implement-outline
+    skill: fathom:implement-outline
     session: interactive
     in: worktree
   implement-decisions:
-    skill: implement-decisions
+    skill: fathom:implement-decisions
     session: headless
     in: worktree
     phases: decisions
@@ -84,7 +84,7 @@ steps:
       jq -e '.verdict == "clean"'
       "$(ls -d "$FATHOM_TASK_DIR"/review-loop/implementation/round-* | sort | tail -1)/findings.json"
   pr:
-    skill: describe-pr
+    skill: fathom:describe-pr
     session: headless
     in: worktree
     produces: pr-description
