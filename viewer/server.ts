@@ -1,11 +1,4 @@
 #!/usr/bin/env bun
-// Local viewer for workflow artifacts.
-//
-//   /                 index of task directories under the root
-//   /view/<path>      a Markdown document, or a directory listing
-//   /frag/<path>      the same document as JSON, for live reload
-//   /raw/<path>       file bytes (HTML artifacts, images)
-//   /events?path=     server-sent events when the document's directory changes
 
 import { existsSync, readdirSync, realpathSync, statSync, watch, type FSWatcher } from "node:fs";
 import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
@@ -30,8 +23,6 @@ if (config.publicUrl) allowedHosts.add(new URL(config.publicUrl).hostname);
 const PAGE_CSP =
   "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
   "img-src 'self' data: https:; font-src 'self' data:; frame-src 'self'; object-src 'none'; base-uri 'none'";
-
-// --------------------------------------------------------------- themes
 
 const themeListeners = new Set<() => void>();
 let themeCache: ThemeSet | null = null;
@@ -81,8 +72,6 @@ function themePicker(): string {
     "</div>"
   );
 }
-
-// ---------------------------------------------------------------- files
 
 /** Absolute path for a path inside the root, or null if it escapes or is missing. */
 function locate(rel: string, base = root): string | null {
@@ -185,8 +174,6 @@ function scanTasks(): Task[] {
   walk(root, 0);
   return tasks.sort((a, b) => b.mtime - a.mtime);
 }
-
-// ---------------------------------------------------------------- html
 
 function ago(ms: number): string {
   const s = Math.max(0, (Date.now() - ms) / 1000);
@@ -305,7 +292,6 @@ async function docPage(abs: string): Promise<string> {
   });
 }
 
-/** Readable name for a task directory (see scanTasks). */
 function scanName(dir: string): string | undefined {
   const dirName = basename(dir);
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(dirName)) return undefined;
@@ -357,8 +343,6 @@ function indexPage(): string {
       `<ul class="tasks" id="tasks">${cards.join("") || `<li>No documents under <code>${escapeHtml(root)}</code>.</li>`}</ul></div>`,
   });
 }
-
-// ---------------------------------------------------------------- http
 
 function html(body: string, status = 200): Response {
   return new Response(body, {

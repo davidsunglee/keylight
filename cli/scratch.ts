@@ -11,7 +11,6 @@ import { currentRepo, currentTask, linkedTasks, storeOf, TaskError, type Repo } 
 
 export const SCRATCH_FILE = "scratch.md";
 
-/** Folder holding the scratch page, and what the page is about. */
 export function scratchHome(config: Config, named: string | undefined): { dir: string; label: string } {
   let repo: Repo;
   try {
@@ -34,7 +33,6 @@ function header(label: string): string {
   return `---\ntype: scratch\n---\n\n# Scratch: ${label}\n`;
 }
 
-/** Add an entry at the top of the page. Returns the page's path. */
 export function addEntry(home: { dir: string; label: string }, text: string): string {
   mkdirSync(home.dir, { recursive: true });
   const path = join(home.dir, SCRATCH_FILE);

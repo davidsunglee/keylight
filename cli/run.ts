@@ -49,8 +49,6 @@ const STATE_FILE = ".fathom.json";
 const dim = (text: string) => (process.stdout.isTTY ? `\x1b[2m${text}\x1b[0m` : text);
 const bold = (text: string) => (process.stdout.isTTY ? `\x1b[1m${text}\x1b[0m` : text);
 
-// ---------------------------------------------------------------- state
-
 export function readState(store: string): State | null {
   const file = join(store, STATE_FILE);
   return existsSync(file) ? (JSON.parse(readFileSync(file, "utf8")) as State) : null;
@@ -84,8 +82,6 @@ export function recordWorktree(store: string, worktree: { path: string; base: st
   writeState(store, state);
 }
 
-// ---------------------------------------------------------------- documents
-
 /** The newest document of a kind in the task folder: `NN-<kind>-<slug>.md`, or `<kind>.md`. */
 export function findDocument(store: string, kind: string, workflows: Workflows): string | null {
   const kinds = documentKinds(workflows);
@@ -100,7 +96,6 @@ export function findDocument(store: string, kind: string, workflows: Workflows):
   return matches.at(-1) ?? null;
 }
 
-/** Phase headings in a document: how many there are and how many are marked done. */
 export function phaseProgress(document: string): { total: number; done: number } {
   // A heading shown inside a code block is an example, not a phase.
   const text = document.replace(/^(`{3,}|~{3,}).*\n[\s\S]*?^\1.*$/gm, "");
@@ -108,13 +103,10 @@ export function phaseProgress(document: string): { total: number; done: number }
   return { total: headings.length, done: headings.filter((h) => h.includes("✅")).length };
 }
 
-// ---------------------------------------------------------------- prompts
-
 function fill(template: string, values: Record<string, string>): string {
   return template.replace(/\{\{\s*(\w+)\s*\}\}/g, (whole, key: string) => values[key] ?? whole);
 }
 
-/** Text of the first of these files that exists. */
 function firstFile(paths: string[]): string | null {
   const found = paths.find((path) => existsSync(path));
   return found ? readFileSync(found, "utf8").trim() : null;
@@ -152,8 +144,6 @@ function openingMessage(name: string, step: Step, launch: Launch, cwd: string, c
   return parts.join("\n\n");
 }
 
-// ---------------------------------------------------------------- sessions
-
 interface Session {
   argv: string[];
   /** Claude Code session id, when the harness lets us choose one. */
@@ -189,13 +179,11 @@ function shellQuote(argv: string[]): string {
   return argv.map((arg) => (/^[\w@%+=:,./-]+$/.test(arg) ? arg : `'${arg.replace(/'/g, `'\\''`)}'`)).join(" ");
 }
 
-/** One line for a tool call in a headless Claude Code session. */
 function toolLine(name: string, input: Record<string, unknown>): string {
   const detail = input.description ?? input.command ?? input.file_path ?? input.pattern ?? input.skill ?? input.prompt ?? "";
   return `  ${name}  ${String(detail).split("\n")[0]!.slice(0, 110)}`;
 }
 
-/** Run a headless Claude Code session, showing its messages and tool calls as they happen. */
 async function runClaudeHeadless(argv: string[], cwd: string, env: Record<string, string>, log: string): Promise<{ ok: boolean; why?: string }> {
   const child = Bun.spawn(argv, { cwd, env, stdin: "ignore", stdout: "pipe", stderr: "inherit" });
   const raw = Bun.file(log).writer();
@@ -235,8 +223,6 @@ async function runClaudeHeadless(argv: string[], cwd: string, env: Record<string
   if (!finished) return { ok: false, why: "the session ended without a result" };
   return { ok: true };
 }
-
-// ---------------------------------------------------------------- the loop
 
 interface Context {
   repo: Repo;

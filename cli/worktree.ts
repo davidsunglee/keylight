@@ -42,7 +42,6 @@ const DEFAULTS: Workspace = {
 };
 
 export interface Worktree {
-  /** The checkout the implementation runs in. */
   path: string;
   /** Commit the work starts from: the fixed point for review. */
   base: string;
@@ -96,7 +95,6 @@ function copyLocalFiles(from: string, to: string, globs: string[]): number {
   return copied;
 }
 
-/** Create (or reuse) the task's worktree and link the task folder into it. */
 export function setupWorktree(repo: Repo, config: Config, task: string): Worktree {
   const checkout = repo.worktree;
   const notes: string[] = [];

@@ -1,5 +1,3 @@
-// fathom task: the task folder for the current worktree.
-//
 // A task's documents live in the artifact root, outside any repository:
 //
 //   <root>/<repo>/<task>/
@@ -37,7 +35,6 @@ export function git(args: string[], cwd?: string): string | null {
 }
 
 export interface Repo {
-  /** Root of the current worktree. */
   worktree: string;
   /** Name shared by every worktree of the repository. */
   name: string;
@@ -111,7 +108,6 @@ function ensureExcluded(repo: Repo) {
   writeFileSync(path, `${current}${current && !current.endsWith("\n") ? "\n" : ""}${EXCLUDE_LINE}\n`);
 }
 
-/** Where a task's documents are stored. */
 export function storeOf(repo: Repo, config: Config, task: string): string {
   return join(config.root, repo.name, task);
 }
@@ -120,10 +116,7 @@ export function slugError(task: string): string | null {
   return SLUG.test(task) ? null : `"${task}" is not a valid task name: use lowercase letters, digits and dashes`;
 }
 
-/**
- * Create the task folder if needed and link it into the repo's worktree.
- * `summary` is the text for a new task.md; an existing one is kept.
- */
+/** `summary` is the text for a new task.md; an existing one is kept. */
 export function ensureTask(repo: Repo, config: Config, task: string, summary?: string): { store: string; isNew: boolean } {
   const problem = slugError(task);
   if (problem) throw new TaskError(problem);

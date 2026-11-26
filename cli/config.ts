@@ -14,7 +14,6 @@ export interface Config {
    * open from a phone. The server itself always listens on loopback.
    */
   publicUrl: string | null;
-  /** Holds themes/, theme.conf and custom.css. */
   configDir: string;
 }
 

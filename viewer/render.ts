@@ -60,7 +60,6 @@ export function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-/** URL path for a file inside the root, each segment encoded. */
 export function urlPath(rel: string): string {
   return rel.split(sep).map(encodeURIComponent).join("/");
 }
@@ -275,7 +274,6 @@ function renderFrontmatter(data: Record<string, unknown>): string {
   return `<details class="frontmatter"><summary>${summary || "Frontmatter"}</summary><table>${rows}</table></details>\n`;
 }
 
-/** Split a leading YAML frontmatter block from the document body. */
 export function splitFrontmatter(source: string): { data: Record<string, unknown> | null; body: string } {
   const match = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/.exec(source);
   if (!match) return { data: null, body: source };

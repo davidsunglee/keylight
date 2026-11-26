@@ -1,18 +1,4 @@
 #!/usr/bin/env bun
-// fathom: task folders, the workflow runner and the artifact viewer.
-//
-//   fathom start ...     seed a task from a ticket or a description, then run it
-//   fathom run           take the task through its workflow (see run.ts)
-//   fathom status        where the task stands in its workflow
-//   fathom task ...      the task folder for the current worktree (see task.ts)
-//   fathom scratch       add a visual to the task's scratch page (see scratch.ts)
-//   fathom view [path]   start the viewer if needed, print the link, open it
-//   fathom url  [path]   same, without opening a browser (for skills to print)
-//   fathom serve         run the viewer in the foreground
-//   fathom stop          stop a background viewer
-//
-// Options: --root DIR  --port N  --public-url URL  --config DIR  --no-open
-// Environment: FATHOM_ROOT, FATHOM_PORT, FATHOM_PUBLIC_URL, FATHOM_CONFIG
 
 import { existsSync, mkdirSync, openSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -55,7 +41,7 @@ async function ping(config: Config): Promise<Ping | null> {
   }
 }
 
-/** Make sure the viewer is running. Returns why not, when it cannot be reached or started. */
+/** Returns why the viewer could not be reached or started, or null when it is running. */
 async function ensureServer(config: Config): Promise<string | null> {
   const running = await ping(config);
   if (running) {
@@ -78,7 +64,7 @@ async function ensureServer(config: Config): Promise<string | null> {
   return `the viewer could not be reached or started from here. See ${log}`;
 }
 
-/** Link for a path inside the root. Paths through a worktree symlink resolve to the same place. */
+/** A path through a worktree symlink resolves to the same link as the stored file. */
 function linkFor(config: Config, target: string | undefined): string {
   const base = config.publicUrl ?? localUrl(config);
   if (!target) return `${base}/`;

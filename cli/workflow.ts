@@ -124,7 +124,6 @@ function profileNamed(config: Workflows, name: string): Record<string, Partial<L
   return profile;
 }
 
-/** How a step's session is launched under a profile. */
 export function launchFor(config: Workflows, profileName: string, step: string): Launch {
   const profile = profileNamed(config, profileName);
   const launch = { harness: "claude", ...profile["*"], ...profile[step] } as Launch;

@@ -1,11 +1,7 @@
-// Browser side of the viewer: Mermaid, themes, live reload, navigation drawer.
-
 const doc = document.getElementById("doc");
 const docPath = document.body.dataset.doc;
 const root = document.documentElement;
 const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
-
-// --------------------------------------------------------------- colors
 
 const probe = document.createElement("span");
 probe.style.display = "none";
@@ -31,8 +27,6 @@ function color(name) {
   const [r, g, b] = pixel.getImageData(0, 0, 1, 1).data;
   return `#${[r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("")}`;
 }
-
-// ------------------------------------------------------------- mermaid
 
 let mermaidReady = null;
 let diagramCount = 0;
@@ -171,15 +165,12 @@ function scanDiagrams() {
   }
 }
 
-/** Redraw diagrams in the current colors, after the theme changes. */
 async function recolorDiagrams() {
   if (!mermaidReady) return;
   configureMermaid(await mermaidReady);
   svgCache.clear();
   for (const block of document.querySelectorAll('.mermaid-block[data-state="done"]')) renderDiagram(block);
 }
-
-// ------------------------------------------------------- diagram dialog
 
 let dialog = null;
 
@@ -221,8 +212,6 @@ function openDiagram(svg) {
   area.style.width = `${Math.max(fit, natural)}px`;
 }
 
-// ---------------------------------------------------------- code blocks
-
 function addCopyButtons() {
   for (const pre of document.querySelectorAll("pre.code:not([data-copy])")) {
     pre.dataset.copy = "";
@@ -246,8 +235,6 @@ function addCopyButtons() {
     pre.append(button);
   }
 }
-
-// -------------------------------------------------------------- outline
 
 let spy = null;
 
@@ -273,8 +260,6 @@ function watchOutline() {
   }
 }
 
-// --------------------------------------------------------------- drawer
-
 const menuButton = document.getElementById("menu-button");
 const sidebar = document.getElementById("sidebar");
 
@@ -291,8 +276,6 @@ sidebar?.addEventListener("click", (event) => {
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") setDrawer(false);
 });
-
-// --------------------------------------------------------------- themes
 
 // The pick is kept per device: a phone and a laptop can differ, and "Auto"
 // follows whatever the theme tool on the host has set.
@@ -345,8 +328,6 @@ function reloadThemeCss() {
 
 darkQuery.addEventListener("change", () => recolorDiagrams());
 
-// ---------------------------------------------------------- live reload
-
 function decorate() {
   scanDiagrams();
   addCopyButtons();
@@ -382,8 +363,6 @@ if (watching) {
     if (document.visibilityState === "visible") refresh().catch(console.error);
   });
 }
-
-// ---------------------------------------------------------- task filter
 
 const filter = document.getElementById("filter");
 filter?.addEventListener("input", () => {
