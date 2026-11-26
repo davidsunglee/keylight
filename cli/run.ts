@@ -13,7 +13,7 @@ import { homedir } from "node:os";
 import { join, relative } from "node:path";
 import type { Config } from "./config";
 import { currentRepo, currentTask, LINK_DIR, storeOf, TaskError, type Repo } from "./task";
-import { documentKinds, launchFor, SKILLS_DIR, workflowNamed, type Launch, type Step, type Workflows } from "./workflow";
+import { ConfigError, documentKinds, launchFor, loadWorkflows, SKILLS_DIR, workflowNamed, type Launch, type Step, type Workflows } from "./workflow";
 import { setupWorktree } from "./worktree";
 
 interface StepState {
@@ -263,7 +263,25 @@ function stepEnv(ctx: Context, name?: string): Record<string, string> {
 
 function describe(step: Step, launch: Launch): string {
   if (step.run) return "code";
-  return [launch.harness, launch.model, launch.effort, step.session].filter(Boolean).join(" · ");
+  const session = [launch.harness, launch.model, launch.effort, step.session].filter(Boolean).join(" · ");
+  const subagents = Object.keys(subagentEnv(launch)).length ? [launch.subagents?.model, launch.subagents?.effort].filter(Boolean).join(" · ") : "";
+  return subagents ? `${session} · sub-agents ${subagents}` : session;
+}
+
+/**
+ * Claude Code's own settings for sub-agents. The force flag makes the model
+ * apply even when the session names another one on a dispatch, so the profile
+ * decides, not the session.
+ */
+function subagentEnv(launch: Launch): Record<string, string> {
+  if (launch.harness !== "claude" || !launch.subagents) return {};
+  const env: Record<string, string> = {};
+  if (launch.subagents.model) {
+    env.CLAUDE_CODE_SUBAGENT_MODEL = launch.subagents.model;
+    env.CLAUDE_CODE_SUBAGENT_MODEL_FORCE = "1";
+  }
+  if (launch.subagents.effort) env.CLAUDE_CODE_SUBAGENT_EFFORT = launch.subagents.effort;
+  return env;
 }
 
 function logFile(ctx: Context, name: string): string {
@@ -310,14 +328,16 @@ async function runStep(name: string, ctx: Context, dryRun: boolean): Promise<str
   const session = sessionCommand(name, step, launch, message, ctx.task, ctx.store, resume);
 
   console.log(`\n${bold(`▸ ${name}`)}  ${dim(describe(step, launch) + (resume ? " · resuming" : ""))}`);
+  const subagents = subagentEnv(launch);
   if (dryRun) {
     console.log(dim(`  in ${cwd}`));
-    console.log(`  ${shellQuote(session.argv)}`);
+    const settings = Object.entries(subagents).map(([key, value]) => `${key}=${value} `).join("");
+    console.log(`  ${settings}${shellQuote(session.argv)}`);
     return null;
   }
 
   mark("started", { harness: launch.harness, session: session.id });
-  const env = stepEnv(ctx, name);
+  const env = { ...stepEnv(ctx, name), ...subagents };
   if (step.session === "headless" && launch.harness === "claude") {
     const log = logFile(ctx, name);
     const result = await runClaudeHeadless(session.argv, cwd, env, log);
@@ -367,13 +387,21 @@ export async function runWorkflow(config: Config, workflows: Workflows, options:
 
   for (; index <= last; index++) {
     const name = steps[index]!;
+    // A run can last hours: read the settings again, so an edit to a profile or step applies from the next step on.
+    try {
+      const latest = loadWorkflows(config.configDir);
+      if (latest.steps[name]) ctx.workflows = latest;
+    } catch (err) {
+      if (!(err instanceof ConfigError)) throw err;
+      console.error(`fathom: keeping the settings already loaded: ${err.message}`);
+    }
     const problem = await runStep(name, ctx, options.dryRun ?? false);
     if (problem) {
       console.error(`\nfathom: ${name} is not finished: ${problem}\nContinue from this step:  fathom run`);
       return 1;
     }
     const next = steps[index + 1];
-    const step = workflows.steps[name]!;
+    const step = ctx.workflows.steps[name]!;
     if (options.dryRun || !next || index === last) continue;
     if (step.session === "interactive" && step.confirm !== false && process.stdin.isTTY) {
       const answer = prompt(`\n${name} is done. Enter starts ${next}; q stops here:`);

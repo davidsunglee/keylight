@@ -89,14 +89,19 @@ steps:
     in: worktree
     produces: pr-description
 
-# A profile says how each step's session is launched. "*" applies to every
-# step; a step's own entry overrides it field by field.
-#   harness      claude (default) or codex
+# A profile says how each step's session is launched. Entries combine field by
+# field, the most specific winning:
+#   <step>          that step
+#   claude, codex   every session in that harness
+#   "*"             every step
+#   harness      claude (default) or codex; set it in "*" or on a step
 #   model        passed to the harness; omitted, the harness uses its own default
 #   effort       reasoning effort; omitted, the harness default
 #   permissions  claude: permission mode (headless default: auto)
 #                codex: sandbox mode (headless default: workspace-write)
 #   args         extra arguments passed to the harness as they are
+#   subagents    { model, effort } for the sub-agents the session dispatches
+#                (claude only; overrides any model the session would pick)
 profiles:
   default:
     "*": { harness: claude }

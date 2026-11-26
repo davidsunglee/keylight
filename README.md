@@ -106,14 +106,18 @@ is launched, so the model and reasoning effort are chosen once, not per session:
 profile: default
 profiles:
   default:
-    "*":        { harness: claude, model: opus, effort: high }
-    research:   { harness: codex, model: <model>, effort: medium }
-    implement-decisions: { model: sonnet, effort: medium }
+    claude: { model: opus, effort: high }          # every Claude Code session
+    codex:  { model: gpt-6.2-sol, effort: high }   # every Codex session
+    tdd:    { model: fable }
+    structure-outline: { harness: codex }
+    research: { subagents: { model: sonnet, effort: high } }
   frugal:
-    "*":        { harness: claude, model: sonnet, effort: medium }
+    claude: { model: sonnet, effort: medium }
 ```
 
-Pick one per task with `--profile`. A step can name any installed skill, so
+Entries combine field by field: a step's own entry wins over its harness's
+entry (`claude`, `codex`), which wins over `"*"`. `subagents` sets the model
+and effort for the sub-agents a step's session dispatches, in Claude Code. Pick a profile per task with `--profile`. A step can name any installed skill, so
 your own skills can be steps.
 
 ### Prompts you always add

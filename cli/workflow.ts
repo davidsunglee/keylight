@@ -23,6 +23,8 @@ export interface Launch {
   effort?: string;
   permissions?: string;
   args?: string[];
+  /** Model and effort for the sub-agents the step's session dispatches. Claude Code only. */
+  subagents?: { model?: string; effort?: string };
 }
 
 export interface Workflows {
@@ -126,11 +128,14 @@ function profileNamed(config: Workflows, name: string): Record<string, Partial<L
 
 export function launchFor(config: Workflows, profileName: string, step: string): Launch {
   const profile = profileNamed(config, profileName);
-  const launch = { harness: "claude", ...profile["*"], ...profile[step] } as Launch;
-  if (launch.harness !== "claude" && launch.harness !== "codex") {
-    throw new ConfigError(`profile "${profileName}", step "${step}": harness must be claude or codex, not "${launch.harness}"`);
+  const general = profile["*"] ?? {};
+  const own = profile[step] ?? {};
+  const harness = own.harness ?? general.harness ?? "claude";
+  if (harness !== "claude" && harness !== "codex") {
+    throw new ConfigError(`profile "${profileName}", step "${step}": harness must be claude or codex, not "${harness}"`);
   }
-  return launch;
+  // A harness's own defaults outrank "*": a model named for every step would be wrong for the other harness.
+  return { ...general, ...profile[harness], ...own, harness };
 }
 
 /** Every document kind a step produces, longest first, to tell `research` from `research-questions`. */
