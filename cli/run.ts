@@ -170,8 +170,8 @@ function sessionCommand(name: string, step: Step, launch: Launch, message: strin
   const argv = headless ? ["codex", "exec"] : ["codex"];
   if (launch.model) argv.push("-m", launch.model);
   if (launch.effort) argv.push("-c", `model_reasoning_effort="${launch.effort}"`);
-  const sandbox = launch.permissions ?? (headless ? "workspace-write" : undefined);
-  if (sandbox) argv.push("-s", sandbox);
+  // Codex refuses --add-dir unless the sandbox allows writing, so the task folder needs this in both modes.
+  argv.push("-s", launch.permissions ?? "workspace-write");
   argv.push("--add-dir", store, ...extra, message);
   return { argv };
 }

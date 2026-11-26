@@ -98,7 +98,7 @@ steps:
 #   model        passed to the harness; omitted, the harness uses its own default
 #   effort       reasoning effort; omitted, the harness default
 #   permissions  claude: permission mode (headless default: auto)
-#                codex: sandbox mode (headless default: workspace-write)
+#                codex: sandbox mode (default: workspace-write)
 #   args         extra arguments passed to the harness as they are
 #   subagents    { model, effort } for the sub-agents the session dispatches
 #                (claude only; overrides any model the session would pick)
