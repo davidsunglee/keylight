@@ -29,6 +29,11 @@ const PAGE_CSP =
 const PUBLIC_URL = "https://box.example.ts.net";
 const OPAQUE = "3f2a9c1e-1b2c-4d5e-8f90-123456789abc";
 const MINUTE = 60_000;
+const { version: mermaidVersion } = JSON.parse(
+  readFileSync(join(import.meta.dir, "..", "..", "node_modules", "mermaid", "package.json"), "utf8"),
+);
+const MERMAID = `/assets/mermaid/${mermaidVersion}`;
+const MERMAID_MODULE = `data-mermaid="${MERMAID}/mermaid.esm.min.mjs"`;
 
 const base = realpathSync(mkdtempSync(join(tmpdir(), "keylight-viewer-")));
 const root = join(base, "artifacts");
@@ -278,7 +283,7 @@ describe("the viewer's own routes", () => {
     expect(await res.text()).toBe(themeCss(loadThemes(configDir)));
   });
 
-  test("/assets/ serves the viewer's files and Mermaid's, and nothing beside them", async () => {
+  test("/assets/ serves the viewer's files and the installed Mermaid's under its version, and nothing beside them", async () => {
     const app = await get("/assets/app.css");
     expect(app.status).toBe(200);
     expect(headersOf(app)).toMatchObject({ "content-type": "text/css;charset=utf-8", "cache-control": "no-cache" });
@@ -290,7 +295,7 @@ describe("the viewer's own routes", () => {
       "cache-control": "no-cache",
     });
     await script.arrayBuffer();
-    const mermaid = await get("/assets/mermaid/mermaid.min.js");
+    const mermaid = await get(`${MERMAID}/mermaid.esm.min.mjs`);
     expect(mermaid.status).toBe(200);
     expect(headersOf(mermaid)).toMatchObject({
       "content-type": "text/javascript;charset=utf-8",
@@ -302,6 +307,10 @@ describe("the viewer's own routes", () => {
       "/assets/",
       "/assets/..%2Fserver.ts",
       "/assets/mermaid/..%2F..%2Fpackage.json",
+      "/assets/mermaid/mermaid.esm.min.mjs",
+      "/assets/mermaid/11.0.0/mermaid.esm.min.mjs",
+      `${MERMAID}`,
+      `${MERMAID}/..%2Fpackage.json`,
     ]) {
       const res = await get(path);
       expect([path, res.status, await res.text()]).toEqual([path, 404, "Not found"]);
@@ -325,7 +334,7 @@ describe("documents and directories", () => {
     const body = await text(`/view/${doc}`);
     const stat = statSync(join(root, doc));
     expect(body).toContain("<title>Research gates</title>");
-    expect(body).toContain(`<body class="with-sidebar" data-doc="${doc}">`);
+    expect(body).toContain(`<body class="with-sidebar" ${MERMAID_MODULE} data-doc="${doc}">`);
     expect(body).toContain(
       '<nav class="crumbs" aria-label="Location"><a href="/" class="home">Artifacts</a><span class="sep">/</span>' +
         '<a href="/view/keylight">keylight</a><span class="sep">/</span><a href="/view/keylight/add-gates">add-gates</a>' +
@@ -361,7 +370,7 @@ describe("documents and directories", () => {
 
   test("/view/ lists a directory, with or without a trailing slash, and nothing a symlink takes outside the root", async () => {
     const body = await text("/view/keylight/");
-    expect(body).toContain('<body class="no-sidebar">');
+    expect(body).toContain(`<body class="no-sidebar" ${MERMAID_MODULE}>`);
     const rows = [...body.matchAll(/<li><a href="([^"]+)"><span class="label">([^<]+)<\/span>/g)].map((m) => [
       m[1],
       m[2],

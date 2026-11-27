@@ -1,7 +1,16 @@
 #!/usr/bin/env bun
 // The artifact viewer: serves one artifact root over loopback HTTP.
 
-import { existsSync, type FSWatcher, readdirSync, realpathSync, type Stats, statSync, watch } from "node:fs";
+import {
+  existsSync,
+  type FSWatcher,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  type Stats,
+  statSync,
+  watch,
+} from "node:fs";
 import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
 import type { Config } from "../cli/config";
 import { TaskError } from "../cli/task";
@@ -10,7 +19,8 @@ import { loadThemes, type ThemeSet, themeCss } from "./themes";
 
 const HERE = import.meta.dir;
 const PUBLIC_DIR = join(HERE, "public");
-const MERMAID_DIR = join(HERE, "..", "node_modules", "mermaid", "dist");
+const MERMAID_PACKAGE = join(HERE, "..", "node_modules", "mermaid");
+const MERMAID_DIR = join(MERMAID_PACKAGE, "dist");
 
 const PAGE_CSP =
   "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
@@ -266,6 +276,16 @@ const SIDEBAR_RESIZER =
   '<div class="sidebar-resizer" id="sidebar-resizer" role="separator" aria-orientation="vertical" ' +
   'aria-label="Resize the sidebar" title="Drag to resize, double-click to reset" tabindex="0"></div>';
 
+/**
+ * The asset path prefix for the installed Mermaid, named by its version so a release
+ * change gives the module and its diagram chunks new URLs. Read on each use because
+ * `bun install` can replace Mermaid under a running viewer.
+ */
+function mermaidPrefix(): string {
+  const { version } = JSON.parse(readFileSync(join(MERMAID_PACKAGE, "package.json"), "utf8"));
+  return `mermaid/${version}/`;
+}
+
 function shell(
   site: Site,
   opts: { title: string; crumbs: string; sidebar?: string; main: string; docPath?: string },
@@ -283,7 +303,7 @@ function shell(
 <script src="/assets/prefs-init.js"></script>
 <script type="module" src="/assets/app.js"></script>
 </head>
-<body class="${hasSidebar ? "with-sidebar" : "no-sidebar"}"${opts.docPath ? ` data-doc="${escapeHtml(opts.docPath)}"` : ""}>
+<body class="${hasSidebar ? "with-sidebar" : "no-sidebar"}" data-mermaid="/assets/${mermaidPrefix()}mermaid.esm.min.mjs"${opts.docPath ? ` data-doc="${escapeHtml(opts.docPath)}"` : ""}>
 <header class="topbar">
   ${hasSidebar ? SIDEBAR_TOGGLE : ""}
   <nav class="crumbs" aria-label="Location">${opts.crumbs}</nav>
@@ -556,7 +576,10 @@ function serveAsset(_site: Site, _req: Request, url: URL): Response {
   const rel = decodePath(url.pathname, "/assets/");
   if (rel === null) return new Response("Bad path", { status: 400 });
   const fromMermaid = rel.startsWith("mermaid/");
-  const abs = fromMermaid ? locate(MERMAID_DIR, rel.slice("mermaid/".length)) : locate(PUBLIC_DIR, rel);
+  const mermaid = fromMermaid ? mermaidPrefix() : "";
+  const abs = fromMermaid
+    ? rel.startsWith(mermaid) && locate(MERMAID_DIR, rel.slice(mermaid.length))
+    : locate(PUBLIC_DIR, rel);
   if (!abs || statSync(abs).isDirectory()) return new Response("Not found", { status: 404 });
   return new Response(Bun.file(abs), {
     headers: { "cache-control": fromMermaid ? "public, max-age=604800" : "no-cache" },
