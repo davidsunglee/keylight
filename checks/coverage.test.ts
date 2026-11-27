@@ -8,7 +8,7 @@ import bunfig from "../bunfig.toml";
 
 const root = join(import.meta.dir, "..");
 const ignored = (bunfig.test.coveragePathIgnorePatterns as string[]).map((pattern) => new Bun.Glob(pattern));
-const counted = [...new Bun.Glob("{cli,viewer}/*.ts").scanSync(root)]
+const counted = [...new Bun.Glob("{cli,viewer}/**/*.ts").scanSync(root)]
   .filter((file) => !ignored.some((glob) => glob.match(file)))
   .sort();
 
@@ -16,6 +16,7 @@ test("finds the production modules", () => {
   expect(counted).toContain("cli/commands.ts");
   expect(counted).toContain("viewer/server.ts");
   expect(counted).not.toContain("cli/keylight.ts");
+  expect(counted).not.toContain("cli/test/support.ts");
 });
 
 test.each(counted)("loads %s", async (file) => {
