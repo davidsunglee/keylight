@@ -9,7 +9,6 @@ import { join } from "node:path";
 import type { FileSink } from "bun";
 import type { Launch, Step } from "./workflow";
 
-/** Everything a harness needs to build a step's session command. */
 export interface SessionRequest {
   name: string;
   step: Step;
@@ -17,7 +16,6 @@ export interface SessionRequest {
   message: string;
   task: string;
   store: string;
-  /** The session to continue instead of starting a new one. */
   resume?: string;
 }
 
@@ -27,17 +25,15 @@ export interface Session {
   id?: string;
 }
 
-/** Why a session did not finish, and where to look. */
 export interface Problem {
   problem: string;
+  /** Where to look, such as the session's log. */
   details?: string[];
 }
 
-/** How a session meets the world while it runs. */
 export interface SessionIo {
   cwd: string;
   env: Record<string, string>;
-  /** Nobody is watching: the session runs unattended to its end. */
   headless: boolean;
   /** A new file to keep the session's raw output in. */
   log(): string;
@@ -46,17 +42,16 @@ export interface SessionIo {
 }
 
 export interface Harness {
-  /** The opening words that start a skill. */
   skillInvocation(skill: string): string;
   sessionCommand(request: SessionRequest): Session;
-  /** Environment the harness reads, added to the step's own. */
-  sessionEnv(launch: Launch): Record<string, string>;
+  /** The environment that applies the profile's sub-agent settings: empty when the harness takes none. */
+  subagentEnv(launch: Launch): Record<string, string>;
   runSession(session: Session, io: SessionIo): Promise<Problem | null>;
 }
 
 const dim = (text: string) => (process.stdout.isTTY ? `\x1b[2m${text}\x1b[0m` : text);
 
-/** Runs a session on the caller's terminal and returns its exit status. */
+/** Runs a session with the caller's terminal as its output, and as its input unless headless. */
 function attend(argv: string[], io: SessionIo): Promise<number> {
   const stdin = io.headless ? "ignore" : "inherit";
   return Bun.spawn(argv, { cwd: io.cwd, env: io.env, stdio: [stdin, "inherit", "inherit"] }).exited;
@@ -100,7 +95,7 @@ function claudeCommand({ name, step, launch, message, task, store, resume }: Ses
   return { argv, id };
 }
 
-/** The parts of a stream-json event the runner reads. */
+/** The parts of a stream-json event this code reads. */
 interface StreamEvent {
   type?: string;
   parent_tool_use_id?: string | null;
@@ -178,7 +173,7 @@ async function streamHeadless(argv: string[], io: SessionIo, log: string): Promi
 const claude: Harness = {
   skillInvocation: (skill) => `/${skill}`,
   sessionCommand: claudeCommand,
-  sessionEnv: subagentEnv,
+  subagentEnv,
   async runSession(session, io) {
     if (!io.headless) {
       await attend(session.argv, io);
@@ -235,7 +230,8 @@ function codexSessionSince(cwd: string, launched: Date): string | undefined {
       String(day.getMonth() + 1).padStart(2, "0"),
       String(day.getDate()).padStart(2, "0"),
     );
-  const places = [cwd, realpathSync(cwd)];
+  // The checkout may have been moved or removed while the session ran.
+  const places = existsSync(cwd) ? [cwd, realpathSync(cwd)] : [cwd];
   const started: CodexThread[] = [];
   for (const dir of new Set([dayDir(launched), dayDir(new Date())])) {
     if (!existsSync(dir)) continue;
@@ -253,7 +249,7 @@ function codexSessionSince(cwd: string, launched: Date): string | undefined {
 const codex: Harness = {
   skillInvocation: (skill) => `Run the \`${skill}\` skill.`,
   sessionCommand: codexCommand,
-  sessionEnv: () => ({}),
+  subagentEnv: () => ({}),
   async runSession(session, io) {
     const launched = new Date();
     const code = await attend(session.argv, io);

@@ -227,7 +227,7 @@ function stepEnv(ctx: RunContext, name?: string): Record<string, string> {
 /** How a session step is launched, e.g. `claude · opus · headless · sub-agents haiku`. */
 function sessionLabel(step: Step, launch: Launch): string {
   const session = [launch.harness, launch.model, launch.effort, step.session].filter(Boolean).join(" · ");
-  const subagents = Object.keys(HARNESSES[launch.harness].sessionEnv(launch)).length
+  const subagents = Object.keys(HARNESSES[launch.harness].subagentEnv(launch)).length
     ? [launch.subagents?.model, launch.subagents?.effort].filter(Boolean).join(" · ")
     : "";
   return subagents ? `${session} · sub-agents ${subagents}` : session;
@@ -246,7 +246,6 @@ type EntryMode = "resume" | "reopen" | "fresh";
 
 interface StepRun {
   dryRun: boolean;
-  /** The step the run goes on to, if any. */
   next: string | undefined;
   entry: EntryMode;
 }
@@ -287,7 +286,6 @@ function runWorktreeStep(name: string, ctx: RunContext, dryRun: boolean): Outcom
   return "done";
 }
 
-/** The session an interactive step continues, if any. */
 function resumedSession(
   name: string,
   step: Step,
@@ -326,7 +324,6 @@ function printDryRun(cwd: string, settings: Record<string, string>, session: Ses
   console.log(`  ${prefix}${shellQuote(session.argv)}`);
 }
 
-/** After the session: what the step left behind, then, at a terminal, whether the person is finished. */
 function concludeStep(name: string, step: Step, ctx: RunContext, cwd: string, next: string | undefined): Outcome {
   const problem = unmet(step, ctx, cwd);
   if (problem) return { problem };
@@ -350,7 +347,7 @@ async function runStep(name: string, ctx: RunContext, run: StepRun): Promise<Out
   const request = sessionRequest(name, step, launch, cwd, ctx, run.entry);
   const harness = HARNESSES[launch.harness];
   const session = harness.sessionCommand(request);
-  const settings = harness.sessionEnv(launch);
+  const settings = harness.subagentEnv(launch);
 
   console.log(`\n${bold(`▸ ${name}`)}  ${dim(sessionLabel(step, launch) + (request.resume ? " · resuming" : ""))}`);
   if (run.dryRun) {
@@ -393,14 +390,16 @@ function runContext(config: Config, workflows: Workflows, options: RunOptions): 
 }
 
 interface StepRange {
-  /** The steps this run takes, in order. */
   steps: string[];
   /** The step the run stops after: --until, or the workflow's last. */
   last: string;
   endsWorkflow: boolean;
 }
 
-/** The steps from --from, or the first unfinished one, through --until. Null when every step is done. */
+/**
+ * The steps from --from, or the first unfinished one, through --until. Null
+ * when every step is done and no --from is given.
+ */
 function stepRange(ctx: RunContext, options: RunOptions): StepRange | null {
   const steps = workflowNamed(ctx.workflows, ctx.state.workflow);
   for (const flagged of [options.from, options.until]) {
@@ -431,7 +430,7 @@ function entryMode(first: boolean, options: RunOptions): EntryMode {
   return first && options.from ? "reopen" : "resume";
 }
 
-/** Says why the run stopped before its last step, and returns the exit status. */
+/** Says why the run stopped short, and returns the exit status. */
 function reportStop(step: string, outcome: Exclude<Outcome, "done">, next: string | undefined): number {
   if (outcome === "open") {
     console.log(`${step} is left open.\n${nextLine("keylight run")}`);
@@ -473,7 +472,6 @@ export async function runWorkflow(config: Config, workflows: Workflows, options:
   return 0;
 }
 
-/** A step's document, with its phase progress when the step tracks phases. */
 function documentNote(step: Step, store: string, workflows: Workflows): string {
   const kind = step.produces ?? step.phases;
   const doc = kind ? findDocument(store, kind, workflows) : null;
@@ -491,8 +489,10 @@ function printSteps(state: State, store: string, workflows: Workflows) {
     const status = state.steps[name]?.status;
     const symbol = status === "done" ? "✓" : status === "started" || !nextShown ? "▸" : "·";
     if (status !== "done") nextShown = true;
-    const settings = step.run ? "code" : sessionLabel(step, launchFor(workflows, state.profile, name));
-    console.log(`  ${symbol} ${name.padEnd(width)}  ${status ? documentNote(step, store, workflows) : dim(settings)}`);
+    const note = status
+      ? documentNote(step, store, workflows)
+      : dim(step.run ? "code" : sessionLabel(step, launchFor(workflows, state.profile, name)));
+    console.log(`  ${symbol} ${name.padEnd(width)}  ${note}`);
   }
 }
 

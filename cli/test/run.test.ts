@@ -793,4 +793,33 @@ describe.serial("keylight status", () => {
       stderr: "",
     });
   });
+
+  test("a started or finished step shows its document even when its launch settings are no longer valid", async () => {
+    using repo = tempRepo({ tasks: ["demo"] });
+    writeWorkflows(repo, 'profiles:\n  default:\n    "*": { harness: gemini }\n');
+    writeFileSync(join(repo.store("demo"), "03-decisions-demo.md"), "## ✅ Phase 1: a\n");
+    writeState(
+      repo,
+      { ...done("grill", "worktree", "implement-decisions", "review"), pr: { status: "started" } },
+      {
+        workflow: "direct",
+      },
+    );
+
+    expect(await keylight("status")).toEqual({
+      code: 0,
+      stdout: [
+        "task      demo",
+        "workflow  direct  (profile default)",
+        "  ✓ grill                03-decisions-demo.md",
+        "  ✓ worktree             ",
+        "  ✓ implement-decisions  03-decisions-demo.md  1/1 phases",
+        "  ✓ review               ",
+        "  ▸ pr                   ",
+        "store     ../artifacts/demo-repo/demo",
+        "",
+      ].join("\n"),
+      stderr: "",
+    });
+  });
 });

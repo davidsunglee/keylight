@@ -44,9 +44,10 @@ function helpCommand(argv: string[]): string[] {
 }
 
 /**
- * The option names help text defines. An option's line is indented least; a
- * line indented further that starts with a flag continues another option's
- * description, so it defines nothing.
+ * The option names help text defines. An option's line is indented at most
+ * four columns past the least-indented one, as a long option without a short
+ * form is; a line indented further that starts with a flag continues another
+ * option's description, so it defines nothing.
  */
 function advertised(help: string): Set<string> {
   const optionLines = help.split("\n").filter((line) => /^\s+-/.test(line));
@@ -70,10 +71,14 @@ function readHelp(command: string[]): { options: Set<string> } | { problem: stri
   try {
     const result = Bun.spawnSync([...command, "--help"], { stdout: "pipe", stderr: "pipe", stdin: "ignore" });
     const why = result.stderr.toString().trim().split("\n").at(-1);
-    read =
-      result.exitCode === 0
-        ? { options: advertised(result.stdout.toString()) }
-        : { problem: `\`${key} --help\` exited with status ${result.exitCode}${why ? `: ${why}` : ""}` };
+    const help = result.stdout.toString();
+    // Codex answers an unknown subcommand's --help with its own help and status 0.
+    const usage = /^Usage:\s+(.*)$/m.exec(help)?.[1] ?? "";
+    if (result.exitCode !== 0)
+      read = { problem: `\`${key} --help\` exited with status ${result.exitCode}${why ? `: ${why}` : ""}` };
+    else if (!`${usage} `.startsWith(`${key} `))
+      read = { problem: `\`${key} --help\` printed no usage for \`${key}\`${usage ? `: Usage: ${usage}` : ""}` };
+    else read = { options: advertised(help) };
   } catch {
     read = { problem: `${command[0]} is not installed` };
   }

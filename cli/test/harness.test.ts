@@ -6,7 +6,7 @@ import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import { HARNESSES, namingCommand, type SessionRequest } from "../harness";
 import type { Launch, Step } from "../workflow";
-import { fakeHarness } from "./support";
+import { fakeHarness, tempDir } from "./support";
 
 const CHECK = join(import.meta.dir, "check-harness.ts");
 
@@ -105,24 +105,44 @@ describe("the session commands", () => {
 
   test("only Claude Code takes sub-agent settings", () => {
     const subagents = { model: "haiku", effort: "low" };
-    expect(HARNESSES.claude.sessionEnv({ harness: "claude", subagents })).toEqual({
+    expect(HARNESSES.claude.subagentEnv({ harness: "claude", subagents })).toEqual({
       CLAUDE_CODE_SUBAGENT_MODEL: "haiku",
       CLAUDE_CODE_SUBAGENT_MODEL_FORCE: "1",
       CLAUDE_CODE_SUBAGENT_EFFORT: "low",
     });
-    expect(HARNESSES.claude.sessionEnv({ harness: "claude", subagents: { effort: "max" } })).toEqual({
+    expect(HARNESSES.claude.subagentEnv({ harness: "claude", subagents: { effort: "max" } })).toEqual({
       CLAUDE_CODE_SUBAGENT_EFFORT: "max",
     });
-    expect(HARNESSES.claude.sessionEnv({ harness: "claude" })).toEqual({});
-    expect(HARNESSES.codex.sessionEnv({ harness: "codex", subagents })).toEqual({});
+    expect(HARNESSES.claude.subagentEnv({ harness: "claude" })).toEqual({});
+    expect(HARNESSES.codex.subagentEnv({ harness: "codex", subagents })).toEqual({});
   });
 });
 
-/** Help text in the shape both CLIs print: options indented least, descriptions after them. */
-function helpListing(options: string[]): string {
+describe.serial("an interactive Codex session", () => {
+  test("whose checkout is removed while it runs ends with nothing to resume", async () => {
+    using _harness = fakeHarness();
+    using checkout = tempDir();
+    const found: (string | undefined)[] = [];
+    const problem = await HARNESSES.codex.runSession(
+      { argv: ["rmdir", checkout.path] },
+      {
+        cwd: checkout.path,
+        env: process.env as Record<string, string>,
+        headless: false,
+        log: () => join(checkout.path, "log"),
+        onSessionFound: (id) => found.push(id),
+      },
+    );
+    expect(problem).toBeNull();
+    expect(found).toEqual([undefined]);
+  });
+});
+
+/** Help text in the shape both CLIs print: the command's usage, then options with their descriptions after them. */
+function helpListing(command: string, options: string[]): string {
   const lines = options.map((option) => `  ${option.padEnd(30)}What it does`);
   return [
-    "Usage: tool [options]",
+    `Usage: ${command} [options]`,
     "",
     "Options:",
     ...lines,
@@ -163,8 +183,10 @@ async function checkHarness(): Promise<{ code: number; stdout: string; stderr: s
 describe.serial("check:harness", () => {
   test("passes when each CLI's help lists every flag keylight passes it", async () => {
     using harness = fakeHarness();
-    harness.help("claude", helpListing(CLAUDE_OPTIONS));
-    for (const command of ["codex", "codex exec", "codex resume"]) harness.help(command, helpListing(CODEX_OPTIONS));
+    harness.help("claude", helpListing("claude", CLAUDE_OPTIONS));
+    for (const command of ["codex", "codex exec", "codex resume"]) {
+      harness.help(command, helpListing(command, CODEX_OPTIONS));
+    }
 
     const result = await checkHarness();
     expect(result.stderr).toBe("");
@@ -179,9 +201,21 @@ describe.serial("check:harness", () => {
 
   test("reports each command whose CLI no longer lists a flag, and a help command that fails", async () => {
     using harness = fakeHarness();
-    harness.help("claude", helpListing(CLAUDE_OPTIONS.filter((option) => !option.startsWith("-r,"))));
-    harness.help("codex", helpListing(CODEX_OPTIONS));
-    harness.help("codex exec", helpListing(CODEX_OPTIONS.filter((option) => !option.startsWith("-s,"))));
+    harness.help(
+      "claude",
+      helpListing(
+        "claude",
+        CLAUDE_OPTIONS.filter((option) => !option.startsWith("-r,")),
+      ),
+    );
+    harness.help("codex", helpListing("codex", CODEX_OPTIONS));
+    harness.help(
+      "codex exec",
+      helpListing(
+        "codex exec",
+        CODEX_OPTIONS.filter((option) => !option.startsWith("-s,")),
+      ),
+    );
 
     const result = await checkHarness();
     expect(result.code).toBe(1);
@@ -196,6 +230,26 @@ describe.serial("check:harness", () => {
       'FAIL  codex interactive, resumed: `codex resume --help` exited with status 2: error: unrecognized subcommand in "codex resume"\n',
     );
     expect(result.stdout).toContain("ok    claude headless:");
+    expect(result.stdout).toContain("ok    codex interactive:");
+  });
+
+  test("fails a subcommand whose help is the top-level help, as Codex prints for one it does not know", async () => {
+    using harness = fakeHarness();
+    harness.help("claude", helpListing("claude", CLAUDE_OPTIONS));
+    for (const command of ["codex", "codex exec", "codex resume"]) {
+      harness.help(command, helpListing("codex", CODEX_OPTIONS));
+    }
+
+    const result = await checkHarness();
+    expect(result.code).toBe(1);
+    for (const [mode, command] of [
+      ["codex headless", "codex exec"],
+      ["codex interactive, resumed", "codex resume"],
+    ]) {
+      expect(result.stderr).toContain(
+        `FAIL  ${mode}: \`${command} --help\` printed no usage for \`${command}\`: Usage: codex [options]\n`,
+      );
+    }
     expect(result.stdout).toContain("ok    codex interactive:");
   });
 });

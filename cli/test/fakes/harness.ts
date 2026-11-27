@@ -10,7 +10,6 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } fr
 import { dirname, join, resolve } from "node:path";
 
 export interface Act {
-  /** Printed to standard output. */
   stdout?: string;
   /** A file whose contents are printed to standard output, such as a recorded transcript. */
   replay?: string;
@@ -64,7 +63,11 @@ function fileCodexSessions(ids: string[]) {
 if (argv.includes("--help")) printHelp();
 
 const step = process.env.KEYLIGHT_STEP ?? "naming";
-const launch: Launch = { program, argv, cwd: process.cwd(), env: process.env as Record<string, string> };
+// Only what keylight sets is kept: the inherited rest can hold credentials, and a failed assertion prints it.
+const env = Object.fromEntries(
+  Object.entries(process.env).filter(([key]) => key.startsWith("KEYLIGHT_") || key.startsWith("CLAUDE_CODE_SUBAGENT_")),
+) as Record<string, string>;
+const launch: Launch = { program, argv, cwd: process.cwd(), env };
 appendFileSync(join(dir, "launches.jsonl"), `${JSON.stringify(launch)}\n`);
 
 const planFile = join(dir, "plan.json");

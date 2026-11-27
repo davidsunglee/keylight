@@ -1,3 +1,2 @@
 #!/bin/sh
-# Stands in for codex on the tests' PATH; harness.ts says what it does.
 exec bun "$(dirname "$0")/harness.ts" codex "$@"

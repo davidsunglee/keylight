@@ -95,7 +95,6 @@ function mergeSettings(base: Settings, user: Settings): Workflows {
   } as Workflows;
 }
 
-/** What is wrong with a step's settings, or null. */
 function stepProblem(name: string, step: unknown): string | null {
   if (!isDict(step)) return `step "${name}" must hold settings`;
   if (!step.skill === !step.run) return `step "${name}" needs either "skill" or "run"`;
