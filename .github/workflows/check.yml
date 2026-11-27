@@ -56,7 +56,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
       # A force push to main leaves the old tip on no branch, so the checkout above lacks it.
-      - run: git fetch --no-tags origin "$BASE"
+      - run: git cat-file -e "$BASE^{commit}" 2>/dev/null || git fetch --no-tags origin "$BASE"
       - uses: oven-sh/setup-bun@v2
       - run: bun run check:commits "$BASE"
 

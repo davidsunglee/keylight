@@ -35,6 +35,6 @@ if (invalid.length === 0) {
     `\n${invalid.length} of ${commits.length} subjects in ${base}..HEAD are not type(scope): subject,` +
       ` with type one of ${TYPES.join(", ")} and scope one of ${SCOPES.join(", ")} or left out.`,
   );
-  console.error(nextLine(`git rebase -i ${base}`));
+  console.error(nextLine(`git rebase -i ${baseSha}`));
 }
 process.exitCode = invalid.length ? 1 : 0;

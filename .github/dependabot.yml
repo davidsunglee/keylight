@@ -1,5 +1,5 @@
 # Security updates only: a limit of 0 turns off version updates, and the
-# security pull requests still read this entry. Dependabot's default subject
+# security pull requests still read these entries. Dependabot's default subject
 # adds a deps scope, which check:commits rejects; the plain prefix passes.
 
 version: 2
@@ -11,3 +11,10 @@ updates:
     open-pull-requests-limit: 0
     commit-message:
       prefix: build
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    commit-message:
+      prefix: ci
