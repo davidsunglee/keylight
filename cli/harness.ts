@@ -230,8 +230,9 @@ function codexSessionSince(cwd: string, launched: Date): string | undefined {
       String(day.getMonth() + 1).padStart(2, "0"),
       String(day.getDate()).padStart(2, "0"),
     );
-  // The checkout may have been moved or removed while the session ran.
-  const places = existsSync(cwd) ? [cwd, realpathSync(cwd)] : [cwd];
+  // A checkout moved or removed while the session ran leaves nothing to resume.
+  if (!existsSync(cwd)) return undefined;
+  const places = [cwd, realpathSync(cwd)];
   const started: CodexThread[] = [];
   for (const dir of new Set([dayDir(launched), dayDir(new Date())])) {
     if (!existsSync(dir)) continue;

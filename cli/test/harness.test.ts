@@ -120,14 +120,15 @@ describe("the session commands", () => {
 
 describe.serial("an interactive Codex session", () => {
   test("whose checkout is removed while it runs ends with nothing to resume", async () => {
-    using _harness = fakeHarness();
+    using harness = fakeHarness();
     using checkout = tempDir();
+    harness.plan({ tdd: [{ codexSessions: ["thread-1"] }] });
     const found: (string | undefined)[] = [];
     const problem = await HARNESSES.codex.runSession(
-      { argv: ["rmdir", checkout.path] },
+      { argv: ["sh", "-c", 'codex && rm -rf "$0"', checkout.path] },
       {
         cwd: checkout.path,
-        env: process.env as Record<string, string>,
+        env: { ...(process.env as Record<string, string>), KEYLIGHT_STEP: "tdd" },
         headless: false,
         log: () => join(checkout.path, "log"),
         onSessionFound: (id) => found.push(id),
