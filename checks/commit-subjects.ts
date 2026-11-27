@@ -1,7 +1,5 @@
-// bun run check:commits [base]: every commit subject in <base>..HEAD has the
-// form AGENTS.md asks for, `type(scope): subject`, with no scope or one of the
-// repository's top-level parts. The base defaults to origin/main, so on a
-// branch the range is the commits it adds to main.
+// The scopes are the top-level parts AGENTS.md names under Commits; keep the two lists the same.
+// The base defaults to origin/main, so on a branch the range is the commits it adds to main.
 
 import { join } from "node:path";
 import { nextLine } from "../cli/say";
@@ -13,13 +11,20 @@ const SUBJECT = new RegExp(`^(${TYPES.join("|")})(\\((${SCOPES.join("|")})\\))?:
 const root = join(import.meta.dir, "..");
 const base = process.argv[2] ?? "origin/main";
 
-const log = Bun.spawnSync(["git", "log", "--format=%h %s", `${base}..HEAD`, "--"], { cwd: root, stdin: "ignore" });
-if (log.exitCode !== 0) {
-  console.error(`git log ${base}..HEAD failed: ${log.stderr.toString().trim()}`);
-  process.exit(1);
+function git(args: string[]): string {
+  const result = Bun.spawnSync(["git", ...args], { cwd: root, stdin: "ignore" });
+  if (result.exitCode !== 0) {
+    console.error(`git ${args.join(" ")} failed: ${result.stderr.toString().trim()}`);
+    process.exit(1);
+  }
+  return result.stdout.toString();
 }
 
-const commits = log.stdout.toString().split("\n").filter(Boolean);
+// Resolved first: an empty base would make the range HEAD..HEAD, and an option-shaped one a log filter, both passing on zero commits.
+const baseSha = git(["rev-parse", "--verify", "--end-of-options", base]).trim();
+const log = git(["log", "--no-show-signature", "--format=%h %s", `${baseSha}..HEAD`, "--"]);
+
+const commits = log.split("\n").filter(Boolean);
 const invalid = commits.filter((line) => !SUBJECT.test(line.slice(line.indexOf(" ") + 1)));
 
 if (invalid.length === 0) {

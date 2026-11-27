@@ -217,11 +217,13 @@ cd keylight
 bun install
 
 # The command: a wrapper in any directory on PATH.
-printf '#!/bin/sh\nexec bun %s/cli/keylight.ts "$@"\n' "$PWD" > ~/.local/bin/keylight
+mkdir -p ~/.local/bin
+printf '#!/bin/sh\nexec bun "%s/cli/keylight.ts" "$@"\n' "$PWD" > ~/.local/bin/keylight
 chmod +x ~/.local/bin/keylight
 
 # Claude Code: one link, named for the skill prefix. The plugin loads from the
 # repository, so edits apply to the next session.
+mkdir -p ~/.claude/skills
 ln -s "$PWD/plugin" ~/.claude/skills/kl
 
 # Codex: register the repository as a marketplace, then install from it.
@@ -331,7 +333,7 @@ export KEYLIGHT_PUBLIC_URL=https://<machine>.<tailnet>.ts.net
 GitHub runs five jobs on every pull request and every push to `main`, each one
 `bun run` script. `main` takes a change only through a pull request whose five
 jobs pass, merged by rebase so its commit subjects land as checked; the owner
-can bypass. Run the same scripts locally before pushing:
+can bypass. Before pushing, run the ones a change touches:
 
 | Script | Checks | Needs |
 | --- | --- | --- |
