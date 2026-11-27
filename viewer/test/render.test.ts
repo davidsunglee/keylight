@@ -166,7 +166,9 @@ describe("renderMarkdown", () => {
       '<p><a href="/view/repo/task/other.md#part">o</a> <a href="/raw/repo/task/page.html">p</a> ' +
         '<a href="/raw/repo/task/notes.txt">n</a> <a href="/view/repo/task/my%20file.md">s</a></p>\n',
     );
-    expect(html(`[abs](${join(task, "other.md")})`)).toBe('<p><a href="/view/repo/task/other.md">abs</a></p>\n');
+    expect(html(`[abs](${encodeURI(join(task, "other.md"))})`)).toBe(
+      '<p><a href="/view/repo/task/other.md">abs</a></p>\n',
+    );
   });
 
   test("leaves a link alone when its target is missing, outside the root, or not percent-encoded validly", () => {

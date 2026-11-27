@@ -90,7 +90,7 @@ describe.serial("the keylight executable", () => {
     const opened = join(repo.outside, "opened");
     mkdirSync(bin);
     for (const opener of ["open", "xdg-open"]) {
-      writeFileSync(join(bin, opener), `#!/bin/sh\nprintf '%s' "$1" > '${opened}'\n`);
+      writeFileSync(join(bin, opener), `#!/bin/sh\nprintf '%s' "$1" > "$(dirname "$0")/../opened"\n`);
       chmodSync(join(bin, opener), 0o755);
     }
     const env = { PATH: `${bin}:${process.env.PATH}`, KEYLIGHT_PUBLIC_URL: "https://box.example.ts.net" };
@@ -133,9 +133,9 @@ describe.serial("the keylight executable", () => {
         `  require("node:fs").writeFileSync(${JSON.stringify(started)}, String(process.pid));\n` +
         "  Bun.sleepSync(1000);\n}\n",
     );
-    // Bun splits BUN_OPTIONS at whitespace a backslash does not escape, and
-    // quoting the path does not keep it whole.
-    const preload = slowServe.replace(/\s/g, "\\$&");
+    // Bun splits BUN_OPTIONS at whitespace and strips quote characters without
+    // honoring them as quoting; only a backslash keeps a character literal.
+    const preload = slowServe.replace(/[^\w/.-]/g, "\\$&");
     const view = Bun.spawn([process.execPath, ENTRY, "view", "--no-open", "--port", String(port)], {
       env: { ...process.env, TMPDIR: repo.outside, BUN_OPTIONS: `--preload ${preload}` },
       stdio: ["ignore", "ignore", "ignore"],
