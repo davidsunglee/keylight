@@ -29,15 +29,19 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
   });
 }
 
+function spawn(args: string[], detached = false): Subprocess {
+  return Bun.spawn([process.execPath, ...args], { cwd: repo, stdio: ["ignore", "inherit", "inherit"], detached });
+}
+
 async function run(args: string[]): Promise<number> {
-  current = Bun.spawn([process.execPath, ...args], { cwd: repo, stdio: ["ignore", "inherit", "inherit"] });
+  current = spawn(args);
   const status = await current.exited;
   current = undefined;
   return status;
 }
 
-function keylight(command: string, ...args: string[]): Promise<number> {
-  return run([join(repo, "cli", "keylight.ts"), command, ...args, ...viewerArgs]);
+function keylight(command: string, ...args: string[]): string[] {
+  return [join(repo, "cli", "keylight.ts"), command, ...args, ...viewerArgs];
 }
 
 const passes = [
@@ -47,7 +51,7 @@ const passes = [
 const failed: string[] = [];
 
 try {
-  if ((await keylight("view", "--no-open")) !== 0) {
+  if ((await run(keylight("view", "--no-open"))) !== 0) {
     failed.push("viewer start");
   } else {
     for (const pass of passes) {
@@ -58,7 +62,9 @@ try {
     }
   }
 } finally {
-  if ((await keylight("stop")) !== 0) failed.push("viewer stop");
+  // Its own process group and no forwarded signal, so a second interrupt cannot
+  // cut short the stop the first one started.
+  if ((await spawn(keylight("stop"), true).exited) !== 0) failed.push("viewer stop");
   rmSync(configDir, { recursive: true, force: true });
 }
 
