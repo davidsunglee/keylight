@@ -133,8 +133,11 @@ describe.serial("the keylight executable", () => {
         `  require("node:fs").writeFileSync(${JSON.stringify(started)}, String(process.pid));\n` +
         "  Bun.sleepSync(1000);\n}\n",
     );
+    // Bun splits BUN_OPTIONS at whitespace a backslash does not escape, and
+    // quoting the path does not keep it whole.
+    const preload = slowServe.replace(/\s/g, "\\$&");
     const view = Bun.spawn([process.execPath, ENTRY, "view", "--no-open", "--port", String(port)], {
-      env: { ...process.env, TMPDIR: repo.outside, BUN_OPTIONS: `--preload ${slowServe}` },
+      env: { ...process.env, TMPDIR: repo.outside, BUN_OPTIONS: `--preload ${preload}` },
       stdio: ["ignore", "ignore", "ignore"],
     });
     let pid = 0;
