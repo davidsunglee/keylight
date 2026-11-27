@@ -142,9 +142,18 @@ function themePicker(set: ThemeSet): string {
 function locate(base: string, rel: string): string | null {
   const abs = resolve(base, rel);
   if (abs !== base && !abs.startsWith(base + sep)) return null;
-  if (!existsSync(abs)) return null;
-  const real = realpathSync(abs);
-  const realBase = realpathSync(base);
+  let real: string;
+  let realBase: string;
+  try {
+    real = realpathSync(abs);
+    realBase = realpathSync(base);
+  } catch (error) {
+    // Missing, or removed while a request was in flight. Other failures, such as
+    // an unreadable file, stay errors so the request reports them as a 500.
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === "ENOENT" || code === "ENOTDIR") return null;
+    throw error;
+  }
   if (real !== realBase && !real.startsWith(realBase + sep)) return null;
   return abs;
 }
