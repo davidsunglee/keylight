@@ -96,7 +96,8 @@ export function loadWorkflows(configDir: string): Workflows {
 
   const where = existsSync(userPath) ? userPath : basePath;
   for (const [name, steps] of Object.entries(config.workflows)) {
-    if (!Array.isArray(steps) || !steps.length) throw new ConfigError(`${where}: workflow "${name}" must list its steps`);
+    if (!Array.isArray(steps) || !steps.length)
+      throw new ConfigError(`${where}: workflow "${name}" must list its steps`);
     for (const step of steps) {
       if (!config.steps[step]) throw new ConfigError(`${where}: workflow "${name}" names an unknown step "${step}"`);
     }
@@ -104,7 +105,8 @@ export function loadWorkflows(configDir: string): Workflows {
   for (const [name, step] of Object.entries(config.steps)) {
     if (!isDict(step)) throw new ConfigError(`${where}: step "${name}" must hold settings`);
     if (!step.skill === !step.run) throw new ConfigError(`${where}: step "${name}" needs either "skill" or "run"`);
-    if (step.run && step.run !== "worktree") throw new ConfigError(`${where}: step "${name}": the only code step is "run: worktree"`);
+    if (step.run && step.run !== "worktree")
+      throw new ConfigError(`${where}: step "${name}": the only code step is "run: worktree"`);
     if (step.skill && step.session !== "headless" && step.session !== "interactive") {
       throw new ConfigError(`${where}: step "${name}" needs "session: headless" or "session: interactive"`);
     }
@@ -132,7 +134,9 @@ export function launchFor(config: Workflows, profileName: string, step: string):
   const own = profile[step] ?? {};
   const harness = own.harness ?? general.harness ?? "claude";
   if (harness !== "claude" && harness !== "codex") {
-    throw new ConfigError(`profile "${profileName}", step "${step}": harness must be claude or codex, not "${harness}"`);
+    throw new ConfigError(
+      `profile "${profileName}", step "${step}": harness must be claude or codex, not "${harness}"`,
+    );
   }
   // A harness's own defaults outrank "*": a model named for every step would be wrong for the other harness.
   return { ...general, ...profile[harness], ...own, harness };

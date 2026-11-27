@@ -100,7 +100,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--fg);
-  font: 16px/1.65 var(--font-sans);
+  font: 16px / 1.65 var(--font-sans);
 }
 
 a {
@@ -659,7 +659,7 @@ pre.code {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface);
-  font: 13px/1.5 var(--font-mono);
+  font: 13px / 1.5 var(--font-mono);
   tab-size: 2;
 }
 
@@ -811,7 +811,7 @@ pre.diff .hunk {
   padding: 14px 16px;
   overflow-x: auto;
   color: var(--muted);
-  font: 12.5px/1.5 var(--font-mono);
+  font: 12.5px / 1.5 var(--font-mono);
 }
 
 .mermaid-block:not([data-state="error"]) .mermaid-src {

@@ -65,7 +65,13 @@ export function contrast(a: string, b: string): number {
 
 function mix(a: string, b: string, amount: number): string {
   const [x, y] = [rgb(a), rgb(b)];
-  return `#${x.map((v, i) => Math.round(v + (y[i]! - v) * amount).toString(16).padStart(2, "0")).join("")}`;
+  return `#${x
+    .map((v, i) =>
+      Math.round(v + (y[i]! - v) * amount)
+        .toString(16)
+        .padStart(2, "0"),
+    )
+    .join("")}`;
 }
 
 /** Hue in degrees and saturation, to tell a brighter shade from a different color. */

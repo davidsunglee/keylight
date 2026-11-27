@@ -9,7 +9,9 @@ import { devices, webkit } from "playwright";
 import { flag } from "../../cli/config";
 
 const argv = process.argv.slice(2);
-const [path, out] = argv.filter((a, i) => !a.startsWith("--") && !["--port", "--at", "--click", "--wait", "--theme"].includes(argv[i - 1] ?? ""));
+const [path, out] = argv.filter(
+  (a, i) => !a.startsWith("--") && !["--port", "--at", "--click", "--wait", "--theme"].includes(argv[i - 1] ?? ""),
+);
 if (!path || !out) throw new Error("usage: bun test/shot.ts <url-path> <out.png>");
 
 const browser = await webkit.launch();
@@ -35,13 +37,16 @@ if (at) await page.locator(at).first().scrollIntoViewIfNeeded();
 if (argv.includes("--drawer")) await page.click("#sidebar-toggle");
 // Give visible diagrams time to draw.
 await page
-  .waitForFunction(() => {
-    const inView = [...document.querySelectorAll<HTMLElement>(".mermaid-block")].filter((b) => {
-      const r = b.getBoundingClientRect();
-      return r.bottom > 0 && r.top < innerHeight;
-    });
-    return inView.every((b) => b.dataset.state === "done" || b.dataset.state === "error");
-  }, { timeout: 15000 })
+  .waitForFunction(
+    () => {
+      const inView = [...document.querySelectorAll<HTMLElement>(".mermaid-block")].filter((b) => {
+        const r = b.getBoundingClientRect();
+        return r.bottom > 0 && r.top < innerHeight;
+      });
+      return inView.every((b) => b.dataset.state === "done" || b.dataset.state === "error");
+    },
+    { timeout: 15000 },
+  )
   .catch(() => console.error("diagrams still rendering"));
 const click = flag(argv, "click");
 if (click) await page.locator(click).first().click();

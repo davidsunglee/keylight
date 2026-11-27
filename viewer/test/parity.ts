@@ -91,7 +91,9 @@ for (const [i, file] of docs.entries()) {
     failures.push(`${rel}\n${[...new Set(issues)].map((x) => `    ${x}`).join("\n")}`);
   }
   if (shots) {
-    await page.screenshot({ path: join(shots, `${String(i + 1).padStart(3, "0")}-${mobile ? "mobile" : "desktop"}.png`) });
+    await page.screenshot({
+      path: join(shots, `${String(i + 1).padStart(3, "0")}-${mobile ? "mobile" : "desktop"}.png`),
+    });
   }
   await page.close();
   if ((i + 1) % 25 === 0) console.error(`  ${i + 1}/${docs.length} documents`);
@@ -99,7 +101,9 @@ for (const [i, file] of docs.entries()) {
 
 await browser.close();
 
-console.log(`${docs.length} documents, ${diagrams} diagrams, ${failed} failed to render (${mobile ? "iPhone 15" : "desktop"} WebKit)`);
+console.log(
+  `${docs.length} documents, ${diagrams} diagrams, ${failed} failed to render (${mobile ? "iPhone 15" : "desktop"} WebKit)`,
+);
 console.log(`${docsWithIssues} documents with issues`);
 if (failures.length) console.log(`\n${failures.join("\n")}`);
 process.exit(failed || docsWithIssues ? 1 : 0);

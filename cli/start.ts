@@ -54,7 +54,10 @@ export function seedFromIssue(issue: LinearIssue, name?: string): Seed {
   return {
     task: name ?? `${issue.identifier.toLowerCase()}-${slugify(issue.title)}`.replace(/-+$/, ""),
     title: `${issue.identifier}: ${issue.title}`,
-    body: [issue.description?.trim() || "(The ticket has no description.)", ...(comments.length ? ["## Comments", ...comments] : [])].join("\n\n"),
+    body: [
+      issue.description?.trim() || "(The ticket has no description.)",
+      ...(comments.length ? ["## Comments", ...comments] : []),
+    ].join("\n\n"),
     ticket: issue.identifier,
     url: issue.url,
   };
@@ -78,7 +81,8 @@ async function fetchLinear(id: string): Promise<LinearIssue> {
   });
   const payload = (await res.json()) as { data?: { issue: LinearIssue | null }; errors?: { message: string }[] };
   const issue = payload.data?.issue;
-  if (!res.ok || !issue) throw new TaskError(`Linear did not return ${id}: ${payload.errors?.[0]?.message ?? res.statusText}`);
+  if (!res.ok || !issue)
+    throw new TaskError(`Linear did not return ${id}: ${payload.errors?.[0]?.message ?? res.statusText}`);
   return issue;
 }
 
@@ -90,8 +94,16 @@ function proposeName(description: string): { title: string; task: string } {
     `Name this piece of software work. Reply with one line of JSON and nothing else: ` +
     `{"title": "<up to 8 words, sentence case>", "slug": "<2 to 5 lowercase words joined by dashes>"}\n\n${description}`;
   try {
-    const result = Bun.spawnSync(["claude", "-p", prompt, "--model", "haiku"], { stdout: "pipe", stderr: "ignore", stdin: "ignore", timeout: 60_000 });
-    const parsed = JSON.parse(/\{[^{}]*\}/.exec(result.stdout.toString())?.[0] ?? "") as { title?: string; slug?: string };
+    const result = Bun.spawnSync(["claude", "-p", prompt, "--model", "haiku"], {
+      stdout: "pipe",
+      stderr: "ignore",
+      stdin: "ignore",
+      timeout: 60_000,
+    });
+    const parsed = JSON.parse(/\{[^{}]*\}/.exec(result.stdout.toString())?.[0] ?? "") as {
+      title?: string;
+      slug?: string;
+    };
     const task = slugify(parsed.slug ?? "");
     return task && parsed.title ? { title: parsed.title, task } : fallback;
   } catch {
@@ -103,7 +115,10 @@ export async function seed(input: string, name: string | undefined): Promise<See
   const id = ticketId(input);
   if (id) return seedFromIssue(await fetchLinear(id), name);
   const description = input.trim();
-  if (!description) throw new TaskError(`usage: keylight start <ticket | "description"> [--workflow NAME] [--profile NAME] [--name TASK]`);
+  if (!description)
+    throw new TaskError(
+      `usage: keylight start <ticket | "description"> [--workflow NAME] [--profile NAME] [--name TASK]`,
+    );
   if (name) return { task: name, title: description.split("\n")[0]!.slice(0, 80), body: description };
   const proposed = proposeName(description);
   let task = proposed.task;

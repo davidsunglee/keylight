@@ -36,7 +36,13 @@ const DEFAULTS: Workspace = {
       localPath: ".",
       sourceRef: "HEAD",
       setupCommand: "",
-      copyGlobs: [".env*", ".claude/settings.local.json", "CLAUDE.local.md", "AGENTS.local.md", ".keylight/workspace.local.json"],
+      copyGlobs: [
+        ".env*",
+        ".claude/settings.local.json",
+        "CLAUDE.local.md",
+        "AGENTS.local.md",
+        ".keylight/workspace.local.json",
+      ],
     },
   ],
 };
@@ -64,7 +70,8 @@ function readWorkspace(checkout: string): Workspace {
   if (existsSync(shared)) settings = readJson(shared);
   else if (existsSync(earlier)) {
     settings = readJson(earlier);
-    if (settings.pathTemplate) settings.pathTemplate = settings.pathTemplate.replace("~/.humanlayer/workspaces", "~/.keylight/workspaces");
+    if (settings.pathTemplate)
+      settings.pathTemplate = settings.pathTemplate.replace("~/.humanlayer/workspaces", "~/.keylight/workspaces");
   }
   if (existsSync(local)) settings = { ...settings, ...readJson(local) };
   return { ...DEFAULTS, ...settings, repos: settings.repos?.length ? settings.repos : DEFAULTS.repos };
@@ -120,16 +127,25 @@ export function setupWorktree(repo: Repo, config: Config, task: string): Worktre
     const source = resolve(checkout, entry.localPath);
     const path = fill(workspace.pathTemplate, { TASKSLUG: task, REPOBASENAME: basename(source) });
     if (existsSync(path)) {
-      if (git(["rev-parse", "--show-toplevel"], path) === null) throw new TaskError(`${path} exists and is not a git checkout`);
+      if (git(["rev-parse", "--show-toplevel"], path) === null)
+        throw new TaskError(`${path} exists and is not a git checkout`);
       notes.push(`reusing ${path}`);
     } else {
       const exists = git(["show-ref", "--verify", `refs/heads/${branch}`], source) !== null;
-      gitOrFail(exists ? ["worktree", "add", path, branch] : ["worktree", "add", "-b", branch, path, entry.sourceRef || "HEAD"], source);
+      gitOrFail(
+        exists ? ["worktree", "add", path, branch] : ["worktree", "add", "-b", branch, path, entry.sourceRef || "HEAD"],
+        source,
+      );
       const copied = copyLocalFiles(source, path, entry.copyGlobs ?? []);
-      notes.push(`created ${path} on branch ${branch}${copied ? `, copied ${copied} local file${copied === 1 ? "" : "s"}` : ""}`);
+      notes.push(
+        `created ${path} on branch ${branch}${copied ? `, copied ${copied} local file${copied === 1 ? "" : "s"}` : ""}`,
+      );
       if (entry.setupCommand) {
         notes.push(`ran: ${entry.setupCommand}`);
-        const setup = Bun.spawnSync(["sh", "-c", entry.setupCommand], { cwd: path, stdio: ["ignore", "inherit", "inherit"] });
+        const setup = Bun.spawnSync(["sh", "-c", entry.setupCommand], {
+          cwd: path,
+          stdio: ["ignore", "inherit", "inherit"],
+        });
         if (setup.exitCode !== 0) throw new TaskError(`setup command failed in ${path}: ${entry.setupCommand}`);
       }
     }

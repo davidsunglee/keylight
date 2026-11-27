@@ -32,7 +32,10 @@ export function loadConfig(argv: string[]): Config {
   const publicUrl = (flag(argv, "public-url") ?? process.env.KEYLIGHT_PUBLIC_URL ?? "").replace(/\/+$/, "") || null;
   const configHome = process.env.XDG_CONFIG_HOME || resolve(homedir(), ".config");
   const configDir = resolve(
-    (flag(argv, "config") ?? process.env.KEYLIGHT_CONFIG ?? resolve(configHome, "keylight")).replace(/^~(?=\/|$)/, homedir()),
+    (flag(argv, "config") ?? process.env.KEYLIGHT_CONFIG ?? resolve(configHome, "keylight")).replace(
+      /^~(?=\/|$)/,
+      homedir(),
+    ),
   );
   return { root: existsSync(rootPath) ? realpathSync(rootPath) : rootPath, port, publicUrl, configDir };
 }
