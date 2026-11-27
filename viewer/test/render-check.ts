@@ -91,6 +91,12 @@ for (const [i, { file, fences }] of docs.entries()) {
   while (request?.redirectedFrom()) request = request.redirectedFrom();
   const status = (await request?.response())?.status();
   if (status !== 200) issues.push(`HTTP ${status ?? "no response"}`);
+  // Diagrams and embeds load only once on screen, which a closed <details> prevents.
+  await page.evaluate(() => {
+    for (const el of document.querySelectorAll(".mermaid-block, iframe.embed-frame")) {
+      for (let d = el.closest("details"); d; d = d.parentElement?.closest("details") ?? null) d.open = true;
+    }
+  });
   // Embedded artifacts load lazily, so each frame is scrolled to before its response is checked.
   for (const embed of await page.locator("iframe.embed-frame").all()) {
     const src = await embed.evaluate((el: HTMLIFrameElement) => el.src);
