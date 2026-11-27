@@ -1,11 +1,13 @@
-# Each job runs one of the package.json check scripts, the same command a
-# developer runs locally. The weekly run is for the harness job alone: Claude
-# Code and Codex can drop a flag without any change here.
+# Each job runs one package.json script, so a failure reproduces locally with
+# the same command. The weekly run is for the harness job: Claude Code and Codex
+# can drop a flag without any change here.
 
 name: check
 
 on:
   pull_request:
+    # edited includes a change of base branch, which moves the range and the test merge.
+    types: [opened, synchronize, reopened, edited]
   push:
     branches: [main]
   schedule:
@@ -45,16 +47,18 @@ jobs:
   commits:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
+    env:
+      BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
     steps:
       # The pull request's own head, not GitHub's test merge, so the range holds the branch's commits.
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
+      # A force push to main leaves the old tip on no branch, so the checkout above lacks it.
+      - run: git fetch --no-tags origin "$BASE"
       - uses: oven-sh/setup-bun@v2
       - run: bun run check:commits "$BASE"
-        env:
-          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
 
   harness:
     runs-on: ubuntu-latest

@@ -1,0 +1,13 @@
+# Security updates only: a limit of 0 turns off version updates, and the
+# security pull requests still read this entry. Dependabot's default subject
+# adds a deps scope, which check:commits rejects; the plain prefix passes.
+
+version: 2
+updates:
+  - package-ecosystem: bun
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    commit-message:
+      prefix: build
