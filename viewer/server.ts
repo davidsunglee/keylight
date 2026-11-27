@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 // The artifact viewer: serves one artifact root over loopback HTTP.
 
-import { existsSync, type FSWatcher, readdirSync, realpathSync, statSync, watch } from "node:fs";
+import { existsSync, type FSWatcher, readdirSync, realpathSync, type Stats, statSync, watch } from "node:fs";
 import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
 import type { Config } from "../cli/config";
 import { TaskError } from "../cli/task";
@@ -165,7 +165,7 @@ function listDir(root: string, dir: string): Entry[] {
     if (d.name.startsWith(".") || d.name === "node_modules") continue;
     const abs = join(dir, d.name);
     const rel = relative(root, abs);
-    let stat;
+    let stat: Stats;
     try {
       // A symlink that is broken or leaves the root is never served, so it is not listed.
       if (d.isSymbolicLink() && !locate(root, rel)) continue;
