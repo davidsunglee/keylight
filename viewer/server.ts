@@ -144,8 +144,16 @@ function themePicker(set: ThemeSet): string {
   );
 }
 
-/** Absolute path for a path inside `base`, or null if it escapes or is missing. */
+// Codes for a path that names no file: missing, removed while a request was in
+// flight, a symlink loop, or a name too long to exist.
+const NO_SUCH_PATH = new Set(["ENOENT", "ENOTDIR", "ELOOP", "ENAMETOOLONG"]);
+
+/**
+ * Absolute path for a path inside `base`, or null if it escapes or names no file.
+ * Any other failure to resolve it, such as an unreadable file, is thrown.
+ */
 function locate(base: string, rel: string): string | null {
+  if (rel.includes("\0")) return null;
   const abs = resolve(base, rel);
   if (abs !== base && !abs.startsWith(base + sep)) return null;
   let real: string;
@@ -154,10 +162,7 @@ function locate(base: string, rel: string): string | null {
     real = realpathSync(abs);
     realBase = realpathSync(base);
   } catch (error) {
-    // Missing, or removed while a request was in flight. Other failures, such as
-    // an unreadable file, stay errors so the request reports them as a 500.
-    const code = (error as NodeJS.ErrnoException).code;
-    if (code === "ENOENT" || code === "ENOTDIR") return null;
+    if (NO_SUCH_PATH.has((error as NodeJS.ErrnoException).code ?? "")) return null;
     throw error;
   }
   if (real !== realBase && !real.startsWith(realBase + sep)) return null;
@@ -196,7 +201,9 @@ function listDir(root: string, dir: string): Entry[] {
       if (d.isSymbolicLink() && !locate(root, rel)) continue;
       stat = statSync(abs);
     } catch {
-      continue; // Removed since the directory was read.
+      // Removed since the directory was read, or unreadable: a listing leaves out
+      // what it cannot describe, where a request for it reports the failure.
+      continue;
     }
     const kind = entryKind(d.name, stat.isDirectory());
     if (kind) out.push({ name: d.name, rel, mtime: stat.mtimeMs, kind });
