@@ -1,11 +1,14 @@
 // Loaded before every test file (bunfig.toml). Pins the terminal a test sees,
 // so a run at a developer's terminal behaves as a run on CI does: no stream is
 // a terminal, standard input is empty, and a question no test scripted fails at
-// once instead of waiting for an answer. Refuses to run where git would read
-// the developer's own settings or act on another repository.
+// once instead of waiting for an answer. The home directory is a temporary
+// one. Refuses to run where git would read the developer's own settings or act
+// on another repository.
 
 import { afterAll, mock } from "bun:test";
-import { rmSync } from "node:fs";
+import { mkdtempSync, realpathSync, rmSync } from "node:fs";
+import * as os from "node:os";
+import { join } from "node:path";
 import * as say from "../say";
 
 /** Fixtures shared by several test files, removed once all of them have run. */
@@ -45,6 +48,16 @@ export const terminal = {
 
 for (const stream of [process.stdin, process.stdout, process.stderr]) Object.assign(stream, { isTTY: false });
 Object.assign(Bun, { stdin: new Blob([""]) });
+
+// Bun's os.homedir() ignores a changed HOME, so the home directory is replaced
+// here instead: what production keeps under ~ (logs, worktrees, Codex sessions,
+// the default root) lands in a directory the run removes, or in the one a
+// fixture moves it to.
+export const home = { path: realpathSync(mkdtempSync(join(os.tmpdir(), "keylight-home-"))) };
+removeAfterRun.push(home.path);
+const actualOs = { ...os };
+const homedir = () => home.path;
+mock.module("node:os", () => ({ ...actualOs, default: { ...actualOs, homedir }, homedir }));
 
 const actual = { ...say };
 mock.module("../say", () => ({

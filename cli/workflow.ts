@@ -74,45 +74,63 @@ function mergeEntries(base: Dict, over: Dict): Dict {
   return out;
 }
 
-export function loadWorkflows(configDir: string): Workflows {
-  const basePath = join(import.meta.dir, "workflows.yaml");
-  const userPath = join(configDir, "workflows.yaml");
-  const base = readYaml(basePath);
-  const user = existsSync(userPath) ? readYaml(userPath) : {};
+interface Settings {
+  data: Dict;
+  path: string;
+}
 
-  const profiles = section(base, "profiles", basePath);
-  for (const [name, entries] of Object.entries(section(user, "profiles", userPath))) {
-    if (!isDict(entries)) throw new ConfigError(`${userPath}: profile "${name}" must map steps to settings`);
+/** The user's settings over the built-in ones, field by field. Shape errors name the file they are in. */
+function mergeSettings(base: Settings, user: Settings): Workflows {
+  const profiles = section(base.data, "profiles", base.path);
+  for (const [name, entries] of Object.entries(section(user.data, "profiles", user.path))) {
+    if (!isDict(entries)) throw new ConfigError(`${user.path}: profile "${name}" must map steps to settings`);
     profiles[name] = mergeEntries(isDict(profiles[name]) ? (profiles[name] as Dict) : {}, entries);
   }
-
-  const config = {
-    default: String(user.default ?? base.default),
-    profile: String(user.profile ?? base.profile),
-    workflows: { ...section(base, "workflows", basePath), ...section(user, "workflows", userPath) },
-    steps: mergeEntries(section(base, "steps", basePath), section(user, "steps", userPath)),
+  return {
+    default: String(user.data.default ?? base.data.default),
+    profile: String(user.data.profile ?? base.data.profile),
+    workflows: { ...section(base.data, "workflows", base.path), ...section(user.data, "workflows", user.path) },
+    steps: mergeEntries(section(base.data, "steps", base.path), section(user.data, "steps", user.path)),
     profiles,
   } as Workflows;
+}
 
-  const where = existsSync(userPath) ? userPath : basePath;
+/** What is wrong with a step's settings, or null. */
+function stepProblem(name: string, step: unknown): string | null {
+  if (!isDict(step)) return `step "${name}" must hold settings`;
+  if (!step.skill === !step.run) return `step "${name}" needs either "skill" or "run"`;
+  if (step.run && step.run !== "worktree") return `step "${name}": the only code step is "run: worktree"`;
+  if (step.skill && step.session !== "headless" && step.session !== "interactive") {
+    return `step "${name}" needs "session: headless" or "session: interactive"`;
+  }
+  return null;
+}
+
+/** Throws a ConfigError naming `where` for the first workflow, then step, that is wrong, then checks the defaults. */
+function assertWorkflowsValid(config: Workflows, where: string) {
   for (const [name, steps] of Object.entries(config.workflows)) {
     if (!Array.isArray(steps) || !steps.length)
       throw new ConfigError(`${where}: workflow "${name}" must list its steps`);
-    for (const step of steps) {
-      if (!config.steps[step]) throw new ConfigError(`${where}: workflow "${name}" names an unknown step "${step}"`);
-    }
+    const unknown = steps.find((step) => !config.steps[step]);
+    if (unknown !== undefined) throw new ConfigError(`${where}: workflow "${name}" names an unknown step "${unknown}"`);
   }
   for (const [name, step] of Object.entries(config.steps)) {
-    if (!isDict(step)) throw new ConfigError(`${where}: step "${name}" must hold settings`);
-    if (!step.skill === !step.run) throw new ConfigError(`${where}: step "${name}" needs either "skill" or "run"`);
-    if (step.run && step.run !== "worktree")
-      throw new ConfigError(`${where}: step "${name}": the only code step is "run: worktree"`);
-    if (step.skill && step.session !== "headless" && step.session !== "interactive") {
-      throw new ConfigError(`${where}: step "${name}" needs "session: headless" or "session: interactive"`);
-    }
+    const problem = stepProblem(name, step);
+    if (problem) throw new ConfigError(`${where}: ${problem}`);
   }
   workflowNamed(config, config.default);
   profileNamed(config, config.profile);
+}
+
+export function loadWorkflows(configDir: string): Workflows {
+  const basePath = join(import.meta.dir, "workflows.yaml");
+  const userPath = join(configDir, "workflows.yaml");
+  const hasUser = existsSync(userPath);
+  const config = mergeSettings(
+    { data: readYaml(basePath), path: basePath },
+    { data: hasUser ? readYaml(userPath) : {}, path: userPath },
+  );
+  assertWorkflowsValid(config, hasUser ? userPath : basePath);
   return config;
 }
 

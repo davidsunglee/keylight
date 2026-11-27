@@ -1,0 +1,3 @@
+#!/bin/sh
+# Stands in for claude on the tests' PATH; harness.ts says what it does.
+exec bun "$(dirname "$0")/harness.ts" claude "$@"

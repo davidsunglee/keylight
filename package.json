@@ -14,6 +14,7 @@
     "gate:tests": "bun test",
     "gate:file-size": "bun checks/file-size.ts",
     "check:browser": "bun viewer/test/check-browser.ts",
+    "check:harness": "bun cli/test/check-harness.ts",
     "serve": "bun cli/keylight.ts serve",
     "render-check": "bun viewer/test/render-check.ts",
     "shot": "bun viewer/test/shot.ts"
