@@ -63,10 +63,6 @@ function copyRepository(to: string) {
     const dir = makeTempDir();
     removeAfterRun.push(dir);
     git(dir, "init", "-q", "-b", "main");
-    // The git commands under test read the developer's global settings; these keep
-    // their hooks and filesystem monitor from running in fixtures.
-    git(dir, "config", "core.hooksPath", "/dev/null");
-    git(dir, "config", "core.fsmonitor", "false");
     git(
       dir,
       "-c",
