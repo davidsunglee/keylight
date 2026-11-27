@@ -121,7 +121,7 @@ export function storeOf(repo: Repo, config: Config, task: string): string {
   return join(config.root, repo.name, task);
 }
 
-export function slugError(task: string): string | null {
+function slugProblem(task: string): string | null {
   return SLUG.test(task) ? null : `"${task}" is not a valid task name: use lowercase letters, digits and dashes`;
 }
 
@@ -132,7 +132,7 @@ export function ensureTask(
   task: string,
   summary?: string,
 ): { store: string; isNew: boolean } {
-  const problem = slugError(task);
+  const problem = slugProblem(task);
   if (problem) throw new TaskError(problem);
   const store = storeOf(repo, config, task);
   const isNew = !existsSync(store);
@@ -195,20 +195,14 @@ function nextDocument(repo: Repo, named: string | undefined, kind: string | unde
   console.log(show(join(link, `${next}-${kind}-${slug}.md`)));
 }
 
-/** `args` are the positional arguments after `task`; `named` is --task or KEYLIGHT_TASK. Returns the exit status. */
+/** `args` are the positional arguments after `task`; `named` is --task or KEYLIGHT_TASK. Failures are thrown as TaskError. */
 export function taskCommand(args: string[], config: Config, named: string | undefined): number {
-  try {
-    const [sub, ...rest] = args;
-    const repo = currentRepo();
-    if (!sub || sub === "show") printTask(repo, config, currentTask(repo, named));
-    else if (sub === "new") newTask(repo, config, rest[0]);
-    else if (sub === "list") listTasks(repo, config);
-    else if (sub === "next") nextDocument(repo, named, rest[0], rest[1]);
-    else throw new TaskError(`unknown subcommand "${sub}".\n${TASK_USAGE}`);
-    return 0;
-  } catch (err) {
-    if (!(err instanceof TaskError)) throw err;
-    console.error(`keylight: ${err.message}`);
-    return 1;
-  }
+  const [sub, ...rest] = args;
+  const repo = currentRepo();
+  if (!sub || sub === "show") printTask(repo, config, currentTask(repo, named));
+  else if (sub === "new") newTask(repo, config, rest[0]);
+  else if (sub === "list") listTasks(repo, config);
+  else if (sub === "next") nextDocument(repo, named, rest[0], rest[1]);
+  else throw new TaskError(`unknown subcommand "${sub}".\n${TASK_USAGE}`);
+  return 0;
 }

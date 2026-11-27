@@ -1,4 +1,6 @@
 [test]
+# Pins the terminal state for every test file and fails any unscripted prompt.
+preload = ["./cli/test/preload.ts"]
 # Applied to each file the tests load, whenever coverage is collected.
 coverageThreshold = { lines = 0.9, functions = 0.9 }
 coveragePathIgnorePatterns = [
