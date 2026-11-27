@@ -12,6 +12,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { homedir } from "node:os";
 import { join, relative } from "node:path";
 import type { Config } from "./config";
+import { ask, nextLine } from "./say";
 import { currentRepo, currentTask, LINK_DIR, storeOf, TaskError, type Repo } from "./task";
 import { ConfigError, documentKinds, launchFor, loadWorkflows, SKILLS_DIR, workflowNamed, type Launch, type Step, type Workflows } from "./workflow";
 import { setupWorktree } from "./worktree";
@@ -290,18 +291,19 @@ function logFile(ctx: Context, name: string): string {
   return join(dir, `${name}-${new Date().toISOString().replace(/[:.]/g, "-")}.jsonl`);
 }
 
-/** Run one step. Returns null when it completed, or why it did not. */
-type Outcome = "done" | "done-stop" | "open" | { problem: string };
+type Outcome = "done" | "done-stop" | "open" | { problem: string; details?: string[] };
 
 /**
  * A document on disk does not prove an interactive step is finished: its skill
  * writes a skeleton first. Only the person who quit the session knows.
  */
-function askFinished(name: string, next: string | undefined): "done" | "done-stop" | "open" {
-  const choices = next ? `Enter = yes, start ${next} · s = yes, stop here · n = not yet` : "Enter = yes · n = not yet";
-  const answer = prompt(`\nThe ${name} session ended. Is ${name} finished?  ${choices}:`)?.trim().toLowerCase();
-  if (answer === undefined || answer.startsWith("n")) return "open";
-  return next && (answer.startsWith("s") || answer.startsWith("q")) ? "done-stop" : "done";
+function askFinished(name: string, following: string | undefined): "done" | "done-stop" | "open" {
+  console.log();
+  const answer = following
+    ? ask(`Is ${name} finished?`, [["Enter", `yes, start ${following}`], ["s", "yes, stop here"], ["n", "not yet"]])
+    : ask(`Is ${name} finished?`, [["Enter", "yes"], ["n", "not yet"]]);
+  if (answer === null || answer.toLowerCase().startsWith("n")) return "open";
+  return following && answer.toLowerCase().startsWith("s") ? "done-stop" : "done";
 }
 
 async function runStep(name: string, ctx: Context, dryRun: boolean, next: string | undefined): Promise<Outcome> {
@@ -354,7 +356,7 @@ async function runStep(name: string, ctx: Context, dryRun: boolean, next: string
   if (step.session === "headless" && launch.harness === "claude") {
     const log = logFile(ctx, name);
     const result = await runClaudeHeadless(session.argv, cwd, env, log);
-    if (!result.ok) return { problem: `${result.why}\n  Full log: ${log}\n  Look into it:  cd ${cwd} && claude --resume ${session.id}` };
+    if (!result.ok) return { problem: result.why ?? "the session failed", details: [`Log:  ${log}`, `Inspect:  cd ${cwd} && claude --resume ${session.id}`] };
   } else {
     const headless = step.session === "headless";
     const child = Bun.spawn(session.argv, { cwd, env, stdio: [headless ? "ignore" : "inherit", "inherit", "inherit"] });
@@ -415,15 +417,16 @@ export async function runWorkflow(config: Config, workflows: Workflows, options:
     const next = index < last ? steps[index + 1] : undefined;
     const outcome = await runStep(name, ctx, options.dryRun ?? false, next);
     if (typeof outcome === "object") {
-      console.error(`\nfathom: ${name} is not finished: ${outcome.problem}\nContinue from this step:  fathom run`);
+      const why = /[.!?]$/.test(outcome.problem) ? outcome.problem : `${outcome.problem}.`;
+      console.error([`\nfathom: ${name} is not finished: ${why}`, ...(outcome.details ?? []), nextLine("fathom run")].join("\n"));
       return 1;
     }
     if (outcome === "open") {
-      console.log(`${name} is left open. Come back to it:  fathom run`);
+      console.log(`${name} is left open.\n${nextLine("fathom run")}`);
       return 0;
     }
     if (outcome === "done-stop") {
-      console.log(`Stopped before ${next}. Continue:  fathom run`);
+      console.log(`Stopped before ${next}.\n${nextLine("fathom run")}`);
       return 0;
     }
   }
@@ -438,7 +441,7 @@ export function printStatus(config: Config, workflows: Workflows, named: string 
   const state = readState(store);
   console.log(`task      ${task}`);
   if (!state) {
-    console.log(`workflow  (not started)  Start it:  fathom run [--workflow NAME]`);
+    console.log(`workflow  (not started)\n${nextLine("fathom run [--workflow NAME]")}`);
     return 0;
   }
   console.log(`workflow  ${state.workflow}  (profile ${state.profile})`);

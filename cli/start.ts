@@ -3,6 +3,7 @@
 // A ticket is fetched by code. A description gets one small model call to
 // propose a title and a task name; pass --name to skip it.
 
+import { ask, nextLine } from "./say";
 import { TaskError } from "./task";
 
 export interface Seed {
@@ -63,9 +64,9 @@ async function fetchLinear(id: string): Promise<LinearIssue> {
   const key = process.env.LINEAR_API_KEY;
   if (!key) {
     throw new TaskError(
-      `${id} looks like a Linear ticket, and LINEAR_API_KEY is not set.\n` +
-        `Create a personal API key in Linear (Settings > Security & access) and export it,\n` +
-        `or describe the task in words instead:  fathom start "what to build"`,
+      `${id} looks like a Linear ticket, and LINEAR_API_KEY is not set. ` +
+        `Export a personal API key from Linear (Settings > Security & access), or describe the task in words.\n` +
+        nextLine('fathom start "what to build"'),
     );
   }
   const query = `query($id: String!) { issue(id: $id) { identifier title description url
@@ -107,7 +108,7 @@ export async function seed(input: string, name: string | undefined): Promise<See
   const proposed = proposeName(description);
   let task = proposed.task;
   if (process.stdin.isTTY) {
-    const answer = prompt(`Task name [${task}]:`)?.trim();
+    const answer = ask("Task name?", [["Enter", task]], "another");
     if (answer) task = answer;
   }
   return { task, title: proposed.title, body: description };

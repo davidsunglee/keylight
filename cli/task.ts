@@ -12,6 +12,7 @@
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative } from "node:path";
 import type { Config } from "./config";
+import { nextLine } from "./say";
 
 export const LINK_DIR = join(".artifacts", "tasks");
 const EXCLUDE_LINE = "/.artifacts/";
@@ -62,19 +63,18 @@ export function currentTask(repo: Repo, named: string | undefined): string {
   const linked = linkedTasks(repo);
   if (named) {
     if (linked.includes(named)) return named;
-    throw new TaskError(`task "${named}" is not linked to this worktree.\nLink it:  fathom task new ${named}`);
+    throw new TaskError(`task "${named}" is not linked to this worktree.\n${nextLine(`fathom task new ${named}`)}`);
   }
   if (linked.length === 1) return linked[0]!;
   if (linked.length === 0) {
     throw new TaskError(
-      `no task is linked to this worktree.\n` +
-        `Link an existing one or create one:  fathom task new <task>\n` +
-        `Tasks stored for ${repo.name}:        fathom task list`,
+      `no task is linked to this worktree. \`fathom task list\` shows the ones stored for ${repo.name}.\n` +
+        nextLine("fathom task new <task>"),
     );
   }
   throw new TaskError(
     `several tasks are linked to this worktree:\n${linked.map((name) => `  ${name}`).join("\n")}\n` +
-      `Name the one you mean by adding:  --task <task>`,
+      nextLine("repeat the command with --task <task>"),
   );
 }
 
@@ -137,7 +137,7 @@ export function ensureTask(repo: Repo, config: Config, task: string, summary?: s
   const link = join(repo.worktree, LINK_DIR, task);
   if (!existsSync(link)) {
     // A dangling link left behind (the store moved) is not replaced silently.
-    if (lstatSync(link, { throwIfNoEntry: false })) throw new TaskError(`${show(link)} exists but points nowhere; remove it and retry`);
+    if (lstatSync(link, { throwIfNoEntry: false })) throw new TaskError(`${show(link)} exists but points nowhere. Remove it, then run the command again.\n${nextLine(`rm ${show(link)}`)}`);
     mkdirSync(dirname(link), { recursive: true });
     symlinkSync(store, link, "dir");
   }
@@ -191,7 +191,7 @@ export function taskCommand(args: string[], config: Config, named: string | unde
     return 0;
   } catch (err) {
     if (!(err instanceof TaskError)) throw err;
-    console.error(`fathom task: ${err.message}`);
+    console.error(`fathom: ${err.message}`);
     return 1;
   }
 }

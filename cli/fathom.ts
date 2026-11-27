@@ -7,6 +7,7 @@ import { flag, loadConfig, localUrl, type Config } from "./config";
 import { urlPath } from "../viewer/render";
 import { currentRepo, currentTask, ensureTask, storeOf, TASK_USAGE, TaskError, taskCommand } from "./task";
 import { gatePrompt, initState, printStatus, readState, recordWorktree, runWorkflow, type RunOptions } from "./run";
+import { nextLine } from "./say";
 import { addEntry, ensurePage, scratchHome } from "./scratch";
 import { seed, taskSummary } from "./start";
 import { ConfigError, loadWorkflows, workflowNamed } from "./workflow";
@@ -41,12 +42,18 @@ async function ping(config: Config): Promise<Ping | null> {
   }
 }
 
-/** Returns why the viewer could not be reached or started, or null when it is running. */
-async function ensureServer(config: Config): Promise<string | null> {
+interface ViewerProblem {
+  why: string;
+  /** The command that clears the problem, when there is one. */
+  fix?: string;
+}
+
+/** Returns null when the viewer is running. */
+async function ensureServer(config: Config): Promise<ViewerProblem | null> {
   const running = await ping(config);
   if (running) {
     if (running.root !== config.root) {
-      return `port ${config.port} already serves ${running.root}. Use --port, or run "fathom stop" first.`;
+      return { why: `port ${config.port} already serves ${running.root}. Pass --port to use another port, or stop that viewer.`, fix: "fathom stop" };
     }
     return null;
   }
@@ -61,7 +68,7 @@ async function ensureServer(config: Config): Promise<string | null> {
     await Bun.sleep(100);
     if (await ping(config)) return null;
   }
-  return `the viewer could not be reached or started from here. See ${log}`;
+  return { why: `the viewer could not be reached or started from here. Its log is ${log}.` };
 }
 
 /** A path through a worktree symlink resolves to the same link as the stored file. */
@@ -146,13 +153,14 @@ async function main() {
     }
     const link = linkFor(config, positional[0]);
     const problem = await ensureServer(config);
-    if (problem && command === "view") fail(problem);
+    if (problem && command === "view") fail(problem.fix ? `${problem.why}\n${nextLine(problem.fix)}` : problem.why);
     // `url` always prints the link: an agent's sandbox may block local network
     // while the viewer is running fine outside it.
     console.log(link);
     // Only a person at a terminal is told; an agent would relay the note as if it were a failure.
     if (problem && process.stderr.isTTY) {
-      console.error(`fathom: ${problem}\nThe link works once the viewer is running (fathom view).`);
+      const rest = problem.fix ? nextLine(problem.fix) : `The link works once the viewer is running.\n${nextLine("fathom view")}`;
+      console.error(`fathom: ${problem.why}\n${rest}`);
     }
     if (command === "view" && !argv.includes("--no-open")) {
       // Open the local address: the public one may only resolve from other devices.
@@ -162,7 +170,7 @@ async function main() {
     return;
   }
 
-  fail(`unknown command "${command}". Run "fathom help".`);
+  fail(`unknown command "${command}".\n${nextLine("fathom help")}`);
 }
 
 const RUN_USAGE = [
@@ -214,7 +222,7 @@ async function workflowCommand(config: Config, named: string | undefined): Promi
     const seeded = await seed(positional.join(" "), flag(argv, "name"));
     const store = storeOf(repo, config, seeded.task);
     if (existsSync(store) && readState(store)) {
-      fail(`task ${seeded.task} already exists. Continue it:  fathom run --task ${seeded.task}`);
+      fail(`task ${seeded.task} already exists.\n${nextLine(`fathom run --task ${seeded.task}`)}`);
     }
     ensureTask(repo, config, seeded.task, taskSummary(seeded, repo.name));
     initState(store, repo.worktree, workflows, workflow, options.profile ?? workflows.profile);
