@@ -332,7 +332,8 @@ hold one document per thing the viewer renders; a new rendering feature adds one
 bun run check:browser
 
 # Render every document that has a diagram (every document with --all) in a running viewer;
-# report failures, non-200 responses, script errors and sideways overflow.
+# report failed or missing diagrams, a document route that answers other than 200 (a redirect included),
+# artifacts not found, script errors and sideways overflow. Documents are .md and .mdx files.
 bun viewer/test/render-check.ts --root <dir> [--port N] [--mobile] [--all] [--match TEXT] [--limit N] [--shots DIR]
 
 # Screenshot one page.

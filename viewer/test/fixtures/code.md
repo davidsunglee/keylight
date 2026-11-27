@@ -42,6 +42,16 @@ bun run check
 for file in viewer/test/fixtures/*.md; do echo "$file"; done
 ```
 
+```python
+@dataclass
+class Document:
+    task: str
+    number: int
+
+    def link(self) -> str:
+        return f"/view/{self.task}/{self.number:02d}"
+```
+
 ```sql
 SELECT name, number FROM documents WHERE task = 'add-ci-cd-quality-gates' ORDER BY number;
 ```

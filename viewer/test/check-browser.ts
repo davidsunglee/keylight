@@ -6,8 +6,9 @@
 //   bun run check:browser
 
 import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { constants, tmpdir } from "node:os";
 import { join } from "node:path";
+import type { Subprocess } from "bun";
 import { freePort } from "./support";
 
 const repo = join(import.meta.dir, "..", "..");
@@ -17,9 +18,22 @@ const port = await freePort();
 const configDir = mkdtempSync(join(tmpdir(), "keylight-check-browser-"));
 const viewerArgs = ["--root", root, "--port", String(port), "--config", configDir];
 
+let current: Subprocess | undefined;
+let interrupted: NodeJS.Signals | undefined;
+// The viewer runs detached and outlives this script, so an interrupt ends the
+// current step and falls through to the stop below instead of exiting here.
+for (const signal of ["SIGINT", "SIGTERM"] as const) {
+  process.on(signal, () => {
+    interrupted = signal;
+    current?.kill(signal);
+  });
+}
+
 async function run(args: string[]): Promise<number> {
-  const child = Bun.spawn([process.execPath, ...args], { cwd: repo, stdio: ["ignore", "inherit", "inherit"] });
-  return await child.exited;
+  current = Bun.spawn([process.execPath, ...args], { cwd: repo, stdio: ["ignore", "inherit", "inherit"] });
+  const status = await current.exited;
+  current = undefined;
+  return status;
 }
 
 function keylight(command: string, ...args: string[]): Promise<number> {
@@ -37,15 +51,20 @@ try {
     failed.push("viewer start");
   } else {
     for (const pass of passes) {
+      if (interrupted) break;
       console.log(`\n${pass.name}`);
       const status = await run([join(import.meta.dir, "render-check.ts"), ...viewerArgs, "--all", ...pass.args]);
       if (status !== 0) failed.push(pass.name);
     }
   }
 } finally {
-  await keylight("stop");
+  if ((await keylight("stop")) !== 0) failed.push("viewer stop");
   rmSync(configDir, { recursive: true, force: true });
 }
 
+if (interrupted) {
+  console.log(`\ncheck:browser interrupted by ${interrupted}`);
+  process.exit(128 + constants.signals[interrupted]);
+}
 console.log(failed.length ? `\ncheck:browser failed: ${failed.join(", ")}` : "\ncheck:browser passed");
 process.exit(failed.length ? 1 : 0);

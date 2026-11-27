@@ -3,15 +3,17 @@
 // behind Safari on Mac and iPhone).
 //
 // Opens every document that contains a Mermaid block (every document with
-// --all), renders each diagram, and reports any that fail, plus responses
-// other than 200, script errors and layout overflow. Exits 1 on any issue or
-// when no document matches.
+// --all), renders each diagram, and reports any that fail or never appear, plus
+// a document route that answers other than 200 (a redirect included), artifacts
+// not found, script errors and layout overflow. Exits 1 on any issue or when no
+// document matches.
 //
 //   bun viewer/test/render-check.ts --root DIR [--port N] [--limit N] [--match TEXT]
 //                                   [--shots DIR] [--mobile] [--all]
 
 import { mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
+import MarkdownIt from "markdown-it";
 import { devices, webkit } from "playwright";
 import { flag, loadConfig } from "../../cli/config";
 import { urlPath } from "../render";
@@ -29,15 +31,25 @@ function findDocs(dir: string, out: string[] = []): string[] {
     if (entry.name.startsWith(".") || entry.name === "node_modules") continue;
     const abs = join(dir, entry.name);
     if (entry.isDirectory()) findDocs(abs, out);
-    else if (entry.name.endsWith(".md")) out.push(abs);
+    else if (/\.mdx?$/i.test(entry.name)) out.push(abs);
   }
   return out;
 }
 
+// Counted with plain markdown-it rather than the viewer's renderer, so a fence
+// the viewer stops turning into a diagram shows up as a missing one.
+const parser = new MarkdownIt({ html: true });
+function mermaidFences(file: string): number {
+  return parser
+    .parse(readFileSync(file, "utf8"), {})
+    .filter((t) => t.type === "fence" && t.info.trim().split(/\s+/)[0]?.toLowerCase() === "mermaid").length;
+}
+
 const docs = findDocs(config.root)
   .filter((f) => !match || f.includes(match))
-  .filter((f) => all || /^\s*```mermaid/m.test(readFileSync(f, "utf8")))
-  .sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)
+  .map((file) => ({ file, fences: mermaidFences(file) }))
+  .filter((doc) => all || doc.fences > 0)
+  .sort((a, b) => statSync(b.file).mtimeMs - statSync(a.file).mtimeMs)
   .slice(0, limit);
 
 if (docs.length === 0) {
@@ -57,7 +69,7 @@ let failed = 0;
 let docsWithIssues = 0;
 const failures: string[] = [];
 
-for (const [i, file] of docs.entries()) {
+for (const [i, { file, fences }] of docs.entries()) {
   const rel = relative(config.root, file);
   const page = await context.newPage();
   const issues: string[] = [];
@@ -67,7 +79,10 @@ for (const [i, file] of docs.entries()) {
   });
 
   const response = await page.goto(`http://localhost:${config.port}/view/${urlPath(rel)}`, { waitUntil: "load" });
-  const status = response?.status();
+  // goto resolves with the response at the end of any redirects; the document route itself must answer.
+  let request = response?.request() ?? null;
+  while (request?.redirectedFrom()) request = request.redirectedFrom();
+  const status = (await request?.response())?.status();
   if (status !== 200) issues.push(`HTTP ${status ?? "no response"}`);
   const result = await page.evaluate(async () => {
     const blocks = [...document.querySelectorAll<HTMLElement>(".mermaid-block")];
@@ -86,14 +101,18 @@ for (const [i, file] of docs.entries()) {
     return {
       total: blocks.length,
       errors,
+      missingArtifacts: [...document.querySelectorAll(".embed-missing")].map((el) => el.textContent ?? ""),
       // The page itself must never scroll sideways; wide content scrolls inside its own box.
       overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
     };
   });
 
-  diagrams += result.total;
-  failed += result.errors.length;
+  const absent = Math.max(0, fences - result.total);
+  diagrams += result.total + absent;
+  failed += result.errors.length + absent;
   for (const e of result.errors) issues.push(e);
+  if (absent) issues.push(`${absent} of ${fences} Mermaid fences rendered no diagram`);
+  for (const text of result.missingArtifacts) issues.push(text);
   if (result.overflow > 1) issues.push(`page overflows horizontally by ${result.overflow}px`);
   if (issues.length) {
     docsWithIssues++;
