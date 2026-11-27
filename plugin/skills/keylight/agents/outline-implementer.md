@@ -39,9 +39,7 @@ If you encounter a mismatch:
 1. **Validation checkboxes**: When automated verification passes, update checkboxes:
    `- [ ] \`bun run typecheck\`` → `- [x] \`bun run typecheck\``
 
-2. **Phase completion**: When every automated check passes and the phase lists no manual verification, mark the phase title:
-   `## Phase 1: Title` → `## ✅ Phase 1: Title`
-   A phase that lists manual verification keeps its title as it is: whoever dispatched you marks it once the human has checked.
+2. **Phase title**: leave it as it is. Whoever dispatched you marks it ✅ once the phase is committed, reviewed and checked.
 
 Edit the outline in place. This creates a persistent record of progress, and the user watches it update in the viewer.
 
@@ -61,6 +59,8 @@ After implementing the phase:
    ```
 
 Leave committing to whoever dispatched you. Task documents are outside the repository and never part of a commit.
+
+Push, publish, or change repository or account settings only where your phase names that action and its destination. Report anything further of that kind as left to do.
 
 ## If You Get Stuck
 

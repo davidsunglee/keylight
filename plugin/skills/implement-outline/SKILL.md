@@ -1,6 +1,6 @@
 ---
 name: implement-outline
-description: Implement a structure outline one phase at a time, with a sub-agent per phase, pausing only for the manual checks the outline lists.
+description: Implement a structure outline one phase at a time, with a sub-agent per phase, stopping only where the outline or a problem needs the human.
 disable-model-invocation: true
 ---
 
@@ -23,12 +23,16 @@ When invoked:
 **Document precedence**: structure outline > TDD > PRD > research > ticket. When documents conflict, the outline takes precedence.
 
 **Progress tracking**: the outline records progress as work completes:
-- Validation checkboxes: `- [ ]` → `- [x]` when a check passes
-- Phase titles: `## Phase N: Title` → `## ✅ Phase N: Title` when the phase is verified. The implementer marks a phase that has no manual checks; you mark a phase that has them, once the human has confirmed.
+- Validation checkboxes: `- [ ]` → `- [x]` when a check passes. The implementer checks off the automated ones.
+- Phase titles: `## Phase N: Title` → `## ✅ Phase N: Title`. You mark it, as the last act of the phase, so ✅ means done: implemented, committed, reviewed where the outline calls for it, and checked by the human where it lists manual checks.
 
 ## Workflow
 
-Work through the phases in order, straight from one into the next. The human is needed at two points only: a manual check the outline lists, and an issue the implementer could not resolve.
+Work through the phases in order, straight from one into the next. The human is needed at three points only:
+
+- a manual check the outline lists
+- an issue the implementer or a review could not resolve
+- an outward-facing action (pushing, publishing, changing repository or account settings) that the outline does not spell out. A phase that names the action and its destination authorizes exactly that; for anything beyond it, ask first.
 
 For each phase:
 
@@ -54,11 +58,23 @@ Update progress markers in the outline as you complete validation steps.
 
 IMPORTANT — keep your prompt short. The implementer reads the documents itself. Do not duplicate the outline contents in your prompt.
 
-### 2. Settle the phase's manual checks
+### 2. Commit the phase
 
-Read the phase's `#### Manual Verification` list in the outline.
+- Create a new commit for the changes
+- Stage only the files the phase changed, and follow the repository's commit instructions: its `AGENTS.md` or `CLAUDE.md`, and the style of `git log --oneline -5`
+- Task documents live outside the repository and git ignores `.artifacts/`, so they stay out of the commit
 
-- **No list, or no unchecked item in it**: the phase is verified. Go to step 3.
+### 3. Review the phase when the outline calls for it
+
+The outline decides which phases get a review: normally in the phase's `#### Review`, sometimes in its overview. Run the `review-loop` skill on the committed phase when the outline calls for it, or the user asked for reviews. Where the outline is silent about a phase, the decision is yours, by the review rule in [`../create-structure-outline/SKILL.md`](../create-structure-outline/SKILL.md).
+
+The review's boundary is the phase (`phase-N`) and its fixed point is the starting commit you noted in step 1. `review-loop` commits its own fixes and ends clean, or stops at one of its gates and puts the question to the human. The phase goes on once the review is clean.
+
+### 4. Settle the phase's manual checks
+
+Manual checks come last, so the human checks the phase as it will stand, review fixes included. Read the phase's `#### Manual Verification` list in the outline.
+
+- **No list, or no unchecked item in it**: go to step 5.
 - **Unchecked items**: report and wait.
   ```
   ## Phase [N]: manual checks
@@ -69,36 +85,23 @@ Read the phase's `#### Manual Verification` list in the outline.
   **Please check:**
   - [Each unchecked manual item from the outline]
   ```
-  When the human confirms, check the items off and mark the phase title ✅. When they report a problem, dispatch the implementer again with what they found, then return to this step.
+  When the human confirms, check the items off. When they report a problem, dispatch the implementer again with what they found, then repeat from step 2.
 
 A manual check that states its own condition ("inspect the screenshots that differ") needs the human only when the condition holds. When it does not hold, check the item off and add a few words saying why.
 
-### 3. Commit the phase
+### 5. Mark the phase done and start the next
 
-- Create a new commit for the changes
-- Stage only the files the phase changed, and follow the repository's commit instructions: its `AGENTS.md` or `CLAUDE.md`, and the style of `git log --oneline -5`
-- Task documents live outside the repository and git ignores `.artifacts/`, so they stay out of the commit
-
-### 4. Review the phase when the outline calls for it
-
-The outline decides which phases get a review: normally in the phase's `#### Review`, sometimes in its overview. Run the `review-loop` skill on the committed phase when the outline calls for it, or the user asked for reviews. Where the outline is silent about a phase, the decision is yours, by the review rule in [`../create-structure-outline/SKILL.md`](../create-structure-outline/SKILL.md).
-
-The review's boundary is the phase (`phase-N`) and its fixed point is the starting commit you noted in step 1. Commit whatever the review changed.
-
-### 5. Start the next phase
-
-Go on to the next phase without waiting.
+Mark the phase title ✅, then go on to the next phase without waiting.
 
 ## Special Instructions
 
 ### Resuming Work
 
-If resuming work on a partially completed outline:
-- Read the outline to understand which phases exist
-- Look for ✅ markers in phase titles to identify completed phases
-- Look for `- [x]` checkboxes to see granular progress within phases
-- Trust that completed work is done unless something seems off
-- Pick up from the first phase without a ✅ marker
+Pick up at the first phase whose title has no ✅. That phase may be partly done, so work out how far it got and continue from that step:
+
+- its automated checkboxes are checked: it is implemented
+- `git log` holds its commit: it is committed
+- the task folder's `review-loop/phase-N/` exists: its review started, and is finished when the latest round's `findings.json` has the verdict `clean`. Running `review-loop` on the same boundary continues an unfinished one.
 
 ### Handling Issues
 
@@ -109,7 +112,7 @@ If the implementer reports a mismatch or gets stuck:
 
 ## After Final Phase Completion
 
-When every phase title carries ✅ and every phase is committed, respond with exactly this, filling in the outline's link from `keylight url <path>`. Do not include a summary or other information.
+When every phase title carries ✅, respond with exactly this, filling in the outline's link from `keylight url <path>`. Do not include a summary or other information.
 
 ```markdown
 ### Status

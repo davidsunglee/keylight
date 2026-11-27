@@ -119,13 +119,15 @@ Each phase has a `### Validation` section with three subsections:
 - `#### Manual Verification`: steps requiring human judgment
 - `#### Review`: yes or no, and why in a few words. On yes, the implementation runs `review-loop` on the phase once it is committed.
 
-**Review rule**: a phase gets a review when it changes behavior, test infrastructure or CI. A formatting-only or mechanical phase does not.
+**Review rule**: a phase gets a review when any part of it changes behavior, test infrastructure or CI. A phase that only formats, renames or moves code does not.
 
 Not every phase requires manual validation — don't add manual steps just to have them. 
 If a phase cannot be manually checked, it may be too small or not vertical enough.
 The goal is to catch issues early, not at the end of a 1000+ line change.
 
 Automated testing is always better than manual testing.
+
+A phase that acts outside the repository (a push, a publication, a change to repository or account settings) names the action and its destination exactly, because the implementation performs what the outline spells out without asking. Where the destination or the authority to act is not settled, make it a manual check.
 
 ## Document Precedence
 
