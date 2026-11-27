@@ -1,12 +1,14 @@
 #!/usr/bin/env bun
-// Rendering check against real artifacts, in headless WebKit (the engine
+// Rendering check against a running viewer, in headless WebKit (the engine
 // behind Safari on Mac and iPhone).
 //
-// Opens every document that contains a Mermaid block, renders each diagram,
-// and reports any that fail, plus script errors and layout overflow.
+// Opens every document that contains a Mermaid block (every document with
+// --all), renders each diagram, and reports any that fail, plus responses
+// other than 200, script errors and layout overflow. Exits 1 on any issue or
+// when no document matches.
 //
-//   bun test/parity.ts --root DIR [--port N] [--limit N] [--match TEXT]
-//                      [--shots DIR] [--mobile]
+//   bun viewer/test/render-check.ts --root DIR [--port N] [--limit N] [--match TEXT]
+//                                   [--shots DIR] [--mobile] [--all]
 
 import { mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -38,6 +40,11 @@ const docs = findDocs(config.root)
   .sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)
   .slice(0, limit);
 
+if (docs.length === 0) {
+  console.log(`No documents matched under ${config.root}.`);
+  process.exit(1);
+}
+
 if (shots) mkdirSync(shots, { recursive: true });
 
 const browser = await webkit.launch();
@@ -59,7 +66,9 @@ for (const [i, file] of docs.entries()) {
     if (msg.type() === "error") issues.push(`console: ${msg.text().slice(0, 200)}`);
   });
 
-  await page.goto(`http://localhost:${config.port}/view/${urlPath(rel)}`, { waitUntil: "load" });
+  const response = await page.goto(`http://localhost:${config.port}/view/${urlPath(rel)}`, { waitUntil: "load" });
+  const status = response?.status();
+  if (status !== 200) issues.push(`HTTP ${status ?? "no response"}`);
   const result = await page.evaluate(async () => {
     const blocks = [...document.querySelectorAll<HTMLElement>(".mermaid-block")];
     const errors: string[] = [];

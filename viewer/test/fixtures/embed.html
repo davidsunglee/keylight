@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Embedded fixture</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 16px;
+      }
+      .boxes {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .boxes div {
+        border: 1px solid currentColor;
+        padding: 8px 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Embedded artifact</h1>
+    <div class="boxes">
+      <div>Research</div>
+      <div>Design</div>
+      <div>Outline</div>
+      <div>Implement</div>
+    </div>
+    <p id="script-state">Script has not run.</p>
+    <script>
+      document.getElementById("script-state").textContent = "Script ran inside the sandbox.";
+    </script>
+  </body>
+</html>

@@ -323,12 +323,17 @@ export KEYLIGHT_PUBLIC_URL=https://<machine>.<tailnet>.ts.net
 
 ### Checking a change
 
-Both tools drive headless WebKit, the engine behind Safari on Mac and iPhone
-(`bunx playwright install webkit` once).
+These tools drive headless WebKit, the engine behind Safari on Mac and iPhone
+(`bunx playwright install webkit` once). The fixtures in `viewer/test/fixtures/`
+hold one document per thing the viewer renders; a new rendering feature adds one.
 
 ```sh
-# Render every document that has a diagram; report failures and sideways overflow.
-bun viewer/test/parity.ts --root <dir> [--mobile] [--match TEXT] [--limit N]
+# Start a viewer over the committed fixtures and render-check them at desktop and phone width.
+bun run check:browser
+
+# Render every document that has a diagram (every document with --all) in a running viewer;
+# report failures, non-200 responses, script errors and sideways overflow.
+bun viewer/test/render-check.ts --root <dir> [--port N] [--mobile] [--all] [--match TEXT] [--limit N] [--shots DIR]
 
 # Screenshot one page.
 bun viewer/test/shot.ts /view/<path> out.png [--mobile] [--dark] [--at CSS] [--theme NAME]

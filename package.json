@@ -13,8 +13,9 @@
     "gate:types": "tsc -p .",
     "gate:tests": "bun test",
     "gate:file-size": "bun checks/file-size.ts",
+    "check:browser": "bun viewer/test/check-browser.ts",
     "serve": "bun cli/keylight.ts serve",
-    "parity": "bun viewer/test/parity.ts",
+    "render-check": "bun viewer/test/render-check.ts",
     "shot": "bun viewer/test/shot.ts"
   },
   "dependencies": {
