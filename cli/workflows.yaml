@@ -77,9 +77,9 @@ steps:
 
       - Worktree: {{ worktree }}
       - Fixed point: {{ base }}
-      - Spec: the decisions document and task.md in {{ dir }}
+      - Spec: the decisions document and task.md in {{ store }}
       - Standards: CODING_STANDARDS.md at the repository root, when it exists
-      - Artifact directory: {{ dir }}
+      - Artifact directory: {{ store }}
       - Boundary: implementation
     check: >-
       jq -e '.verdict == "clean"'

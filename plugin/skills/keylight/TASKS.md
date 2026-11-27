@@ -16,7 +16,7 @@ files
   task.md
 ```
 
-`dir` is a symlink into the artifact store, which lives outside the repository. Read and write through `dir` as an ordinary directory. Git ignores it, so task documents stay out of every commit.
+`dir` is a symlink into the artifact store, which lives outside the repository. Read and write through `dir` as an ordinary directory. Git ignores it, so task documents stay out of every commit. A program that is handed an output path needs the `store` path instead: `codex exec -o`, for one, cannot write through the link.
 
 When no task is linked, `keylight task` says so:
 
