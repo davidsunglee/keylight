@@ -18,6 +18,8 @@
     "gate:dead-code-production": "bunx --bun knip --production",
     "gate:file-size": "bun checks/file-size.ts",
     "check:browser": "bun viewer/test/check-browser.ts",
+    "check:audit": "bun audit --ignore=GHSA-238p-pmpm-9mq7",
+    "check:commits": "bun checks/commit-subjects.ts",
     "check:harness": "bun cli/test/check-harness.ts",
     "serve": "bun cli/keylight.ts serve",
     "render-check": "bun viewer/test/render-check.ts",

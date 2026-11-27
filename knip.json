@@ -3,6 +3,7 @@
   "entry": [
     "viewer/public/app.js!",
     "viewer/public/prefs-init.js!",
+    "checks/commit-subjects.ts!",
     "checks/file-size.ts!",
     "cli/test/preload.ts",
     "cli/test/check-harness.ts",
