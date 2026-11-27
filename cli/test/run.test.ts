@@ -253,6 +253,9 @@ describe.serial("keylight run", () => {
     const before = readFileSync(join(repo.store("demo"), ".keylight.json"), "utf8");
 
     const result = await keylight("run", "--dry-run", "--profile", "default");
+    // The plan prints shell words, so a temp path with a space or quote is quoted.
+    const path = repo.store("demo");
+    const store = /^[\w@%+=:,./-]+$/.test(path) ? path : `'${path.replaceAll("'", "'\\''")}'`;
     expect(result.code).toBe(0);
     expect(result.stderr).toBe("");
     expect(plain(result.stdout)).toBe(
@@ -263,11 +266,11 @@ describe.serial("keylight run", () => {
         "",
         "▸ implement-outline  claude · interactive",
         "  in <worktree>",
-        `  claude /kl:implement-outline --session-id ${result.stdout.match(/--session-id ([\w-]+)/)?.[1]} --name 'demo · implement-outline' --add-dir ${repo.store("demo")}`,
+        `  claude /kl:implement-outline --session-id ${result.stdout.match(/--session-id ([\w-]+)/)?.[1]} --name 'demo · implement-outline' --add-dir ${store}`,
         "",
         "▸ pr  claude · headless",
         "  in <worktree>",
-        `  claude -p '/kl:describe-pr\n\n${UNATTENDED}' --session-id ${[...result.stdout.matchAll(/--session-id ([\w-]+)/g)][1]?.[1]} --output-format stream-json --verbose --permission-mode auto --name 'demo · pr' --add-dir ${repo.store("demo")}`,
+        `  claude -p '/kl:describe-pr\n\n${UNATTENDED}' --session-id ${[...result.stdout.matchAll(/--session-id ([\w-]+)/g)][1]?.[1]} --output-format stream-json --verbose --permission-mode auto --name 'demo · pr' --add-dir ${store}`,
         "",
       ].join("\n"),
     );
