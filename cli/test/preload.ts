@@ -18,9 +18,13 @@ afterAll(() => {
 // no test can set or clear these for the git commands production code runs.
 // .env.test supplies the isolation, but a variable already in the environment
 // outranks it.
-if (process.env.GIT_CONFIG_GLOBAL !== "/dev/null" || process.env.GIT_CONFIG_NOSYSTEM !== "1") {
+const isolation = { GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" };
+const overridden = Object.entries(isolation)
+  .filter(([name, value]) => process.env[name] !== value)
+  .map(([name]) => name);
+if (overridden.length) {
   throw new Error(
-    "run the tests from the repository root with GIT_CONFIG_GLOBAL unset, so .env.test keeps git from reading your own settings",
+    `run the tests from the repository root with ${overridden.join(", ")} unset, so .env.test keeps git from reading your own settings`,
   );
 }
 const redirects = ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_COMMON_DIR"];
