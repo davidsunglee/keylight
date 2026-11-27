@@ -16,6 +16,15 @@ async function waitFor(check: () => Promise<boolean>, what: string) {
   throw new Error(`timed out waiting for ${what}`);
 }
 
+function isRunning(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const answers = async (port: number) =>
   fetch(`http://127.0.0.1:${port}/__ping`, { signal: AbortSignal.timeout(500) }).then(
     (res) => res.ok,
@@ -108,6 +117,40 @@ describe.serial("the keylight executable", () => {
       );
     } finally {
       child.kill("SIGKILL");
+    }
+  });
+
+  test("view interrupted before its viewer answers stops that viewer and dies by the same signal", async () => {
+    using repo = tempRepo();
+    const port = await freePort();
+    const started = join(repo.outside, "serve-started");
+    // Holds the detached `serve` back after it writes its pid, so the interrupt
+    // lands while view is still waiting for an answer.
+    const slowServe = join(repo.outside, "slow-serve.ts");
+    writeFileSync(
+      slowServe,
+      `if (process.argv.includes("serve")) {\n` +
+        `  require("node:fs").writeFileSync(${JSON.stringify(started)}, String(process.pid));\n` +
+        "  Bun.sleepSync(1000);\n}\n",
+    );
+    const view = Bun.spawn([process.execPath, ENTRY, "view", "--no-open", "--port", String(port)], {
+      env: { ...process.env, TMPDIR: repo.outside, BUN_OPTIONS: `--preload ${slowServe}` },
+      stdio: ["ignore", "ignore", "ignore"],
+    });
+    let pid = 0;
+    try {
+      await waitFor(async () => existsSync(started), "the viewer to start");
+      pid = Number(readFileSync(started, "utf8"));
+      view.kill("SIGINT");
+      await view.exited;
+      expect(view.signalCode).toBe("SIGINT");
+      // Past the hold, when a viewer left running would be listening.
+      await Bun.sleep(1200);
+      expect(await answers(port)).toBe(false);
+      expect(isRunning(pid)).toBe(false);
+    } finally {
+      view.kill("SIGKILL");
+      if (pid && isRunning(pid)) process.kill(pid, "SIGKILL");
     }
   });
 
