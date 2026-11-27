@@ -279,11 +279,16 @@ const SIDEBAR_RESIZER =
 /**
  * The asset path prefix for the installed Mermaid, named by its version so a release
  * change gives the module and its diagram chunks new URLs. Read on each use because
- * `bun install` can replace Mermaid under a running viewer.
+ * `bun install` can replace Mermaid under a running viewer. Null while an install
+ * has it removed, so pages still render and only diagrams fail.
  */
-function mermaidPrefix(): string {
-  const { version } = JSON.parse(readFileSync(join(MERMAID_PACKAGE, "package.json"), "utf8"));
-  return `mermaid/${version}/`;
+function mermaidPrefix(): string | null {
+  try {
+    const { version } = JSON.parse(readFileSync(join(MERMAID_PACKAGE, "package.json"), "utf8"));
+    return `mermaid/${version}/`;
+  } catch {
+    return null;
+  }
 }
 
 function shell(
@@ -291,6 +296,7 @@ function shell(
   opts: { title: string; crumbs: string; sidebar?: string; main: string; docPath?: string },
 ): string {
   const hasSidebar = Boolean(opts.sidebar);
+  const mermaid = mermaidPrefix();
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -303,7 +309,7 @@ function shell(
 <script src="/assets/prefs-init.js"></script>
 <script type="module" src="/assets/app.js"></script>
 </head>
-<body class="${hasSidebar ? "with-sidebar" : "no-sidebar"}" data-mermaid="/assets/${mermaidPrefix()}mermaid.esm.min.mjs"${opts.docPath ? ` data-doc="${escapeHtml(opts.docPath)}"` : ""}>
+<body class="${hasSidebar ? "with-sidebar" : "no-sidebar"}"${mermaid ? ` data-mermaid="/assets/${mermaid}mermaid.esm.min.mjs"` : ""}${opts.docPath ? ` data-doc="${escapeHtml(opts.docPath)}"` : ""}>
 <header class="topbar">
   ${hasSidebar ? SIDEBAR_TOGGLE : ""}
   <nav class="crumbs" aria-label="Location">${opts.crumbs}</nav>
@@ -576,9 +582,9 @@ function serveAsset(_site: Site, _req: Request, url: URL): Response {
   const rel = decodePath(url.pathname, "/assets/");
   if (rel === null) return new Response("Bad path", { status: 400 });
   const fromMermaid = rel.startsWith("mermaid/");
-  const mermaid = fromMermaid ? mermaidPrefix() : "";
+  const mermaid = fromMermaid ? mermaidPrefix() : null;
   const abs = fromMermaid
-    ? rel.startsWith(mermaid) && locate(MERMAID_DIR, rel.slice(mermaid.length))
+    ? mermaid !== null && rel.startsWith(mermaid) && locate(MERMAID_DIR, rel.slice(mermaid.length))
     : locate(PUBLIC_DIR, rel);
   if (!abs || statSync(abs).isDirectory()) return new Response("Not found", { status: 404 });
   return new Response(Bun.file(abs), {
