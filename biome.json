@@ -29,6 +29,9 @@
           "options": { "maxAllowedComplexity": 15 }
         }
       },
+      "suspicious": {
+        "noImportCycles": "error"
+      },
       "style": {
         "noNonNullAssertion": "off"
       }
@@ -41,6 +44,36 @@
         "rules": {
           "complexity": {
             "noExcessiveCognitiveComplexity": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["viewer/*.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [{ "group": ["../cli/**"], "message": "The viewer does not depend on the CLI." }]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["cli/*.ts", "!cli/commands.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [{ "group": ["../viewer/**"], "message": "Only the command table reaches the viewer." }]
+              }
+            }
           }
         }
       }

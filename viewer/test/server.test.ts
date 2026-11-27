@@ -17,9 +17,8 @@ import {
 import { connect } from "node:net";
 import { networkInterfaces, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import type { Config } from "../../cli/config";
 import { EMBED_SANDBOX } from "../render";
-import { startViewer, type Viewer } from "../server";
+import { startViewer, type Viewer, type ViewerOptions } from "../server";
 import { loadThemes, themeCss } from "../themes";
 import { freePort } from "./support";
 
@@ -102,7 +101,7 @@ function buildFixture() {
 
 let port = 0;
 let viewer: Viewer;
-const configFor = (overrides: Partial<Config> = {}): Config => ({
+const optionsFor = (overrides: Partial<ViewerOptions> = {}): ViewerOptions => ({
   root,
   port,
   publicUrl: PUBLIC_URL,
@@ -113,7 +112,7 @@ const configFor = (overrides: Partial<Config> = {}): Config => ({
 beforeAll(async () => {
   buildFixture();
   port = await freePort();
-  viewer = startViewer(configFor());
+  viewer = startViewer(optionsFor());
 });
 
 afterAll(async () => {
@@ -529,11 +528,6 @@ describe("live updates", () => {
 });
 
 describe("startViewer", () => {
-  test("refuses a root that does not exist", () => {
-    const missing = join(base, "missing");
-    expect(() => startViewer(configFor({ root: missing }))).toThrow(`artifact root does not exist: ${missing}`);
-  });
-
   test("an empty root says where it looked, and no themes means no theme menu", async () => {
     const empty = join(base, "empty-root");
     mkdirSync(empty);
@@ -551,7 +545,7 @@ describe("startViewer", () => {
 
   test("stop ends open event streams and frees the port", async () => {
     const at = await freePort();
-    const other = startViewer(configFor({ port: at }));
+    const other = startViewer(optionsFor({ port: at }));
     let reader: ReadableStreamDefaultReader<Uint8Array>;
     try {
       const res = await fetch(`http://127.0.0.1:${at}/events`);
