@@ -177,7 +177,8 @@ const RUN_USAGE = [
   'fathom start <ticket | "description">   create a task and run its workflow',
   "       [--workflow NAME] [--profile NAME] [--name TASK] [--no-run]",
   "fathom run                       continue the task's workflow from its first unfinished step",
-  "       [--from STEP] [--until STEP] [--dry-run] [--workflow NAME] [--profile NAME]",
+  "       [--from STEP] [--until STEP] [--fresh] [--dry-run] [--workflow NAME] [--profile NAME]",
+  "       --from goes back to a step and continues its session; --fresh starts that step over",
   "fathom status                    the task's steps and how far they are",
   "fathom worktree                  create the task's worktree and link the task into it",
   "fathom gate <step> <gate>        print the prompt for a point inside a step",
@@ -194,6 +195,7 @@ async function workflowCommand(config: Config, named: string | undefined): Promi
     from: flag(argv, "from"),
     until: flag(argv, "until"),
     dryRun: argv.includes("--dry-run"),
+    fresh: argv.includes("--fresh"),
   };
 
   if (command === "status") return printStatus(config, workflows, named);

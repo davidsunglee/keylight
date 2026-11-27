@@ -77,6 +77,7 @@ step was meant to leave behind, start the next. No model decides the order.
 fathom start COR-310                  # seed from a Linear ticket (needs LINEAR_API_KEY), then run
 fathom start "what to build" --workflow direct
 fathom run                            # continue from the first unfinished step
+fathom run --from tdd                 # go back to a step: continues its session (--fresh starts it over)
 fathom run --from tdd --until tdd     # one step; --dry-run prints the commands instead
 fathom status                         # the steps and how far they are
 ```

@@ -44,6 +44,8 @@ export interface RunOptions {
   from?: string;
   until?: string;
   dryRun?: boolean;
+  /** Start the first step in a new session even when it has one to resume. */
+  fresh?: boolean;
 }
 
 const STATE_FILE = ".fathom.json";
@@ -306,7 +308,7 @@ function askFinished(name: string, following: string | undefined): "done" | "don
   return following && answer.toLowerCase().startsWith("s") ? "done-stop" : "done";
 }
 
-async function runStep(name: string, ctx: Context, dryRun: boolean, next: string | undefined): Promise<Outcome> {
+async function runStep(name: string, ctx: Context, dryRun: boolean, next: string | undefined, entry: "resume" | "reopen" | "fresh"): Promise<Outcome> {
   const { state, workflows, config } = ctx;
   const step = workflows.steps[name]!;
   const mark = (status: StepState["status"], more: Partial<StepState> = {}) => {
@@ -338,7 +340,9 @@ async function runStep(name: string, ctx: Context, dryRun: boolean, next: string
     skills: SKILLS_DIR,
   };
   const previous = state.steps[name];
-  const resume = step.session === "interactive" && previous?.status === "started" ? previous.session : undefined;
+  // Going back to a finished step means continuing its session: a new one would write a second document.
+  const open = previous?.status === "started" || entry === "reopen";
+  const resume = step.session === "interactive" && open && entry !== "fresh" && previous?.harness === launch.harness ? previous.session : undefined;
   const message = openingMessage(name, step, launch, existsSync(cwd) ? cwd : state.checkout, config, values);
   const session = sessionCommand(name, step, launch, message, ctx.task, ctx.store, resume);
 
@@ -401,6 +405,7 @@ export async function runWorkflow(config: Config, workflows: Workflows, options:
     console.log(`Every step of ${ctx.state.workflow} is done for ${ctx.task}.`);
     return 0;
   }
+  const start = index;
   const last = options.until ? steps.indexOf(options.until) : steps.length - 1;
   console.log(`${bold(ctx.task)}  ${dim(`${ctx.state.workflow} workflow · ${ctx.state.profile} profile`)}`);
 
@@ -415,7 +420,9 @@ export async function runWorkflow(config: Config, workflows: Workflows, options:
       console.error(`fathom: keeping the settings already loaded: ${err.message}`);
     }
     const next = index < last ? steps[index + 1] : undefined;
-    const outcome = await runStep(name, ctx, options.dryRun ?? false, next);
+    const first = name === steps[start];
+    const entry = first && options.fresh ? "fresh" : first && options.from ? "reopen" : "resume";
+    const outcome = await runStep(name, ctx, options.dryRun ?? false, next, entry);
     if (typeof outcome === "object") {
       const why = /[.!?]$/.test(outcome.problem) ? outcome.problem : `${outcome.problem}.`;
       console.error([`\nfathom: ${name} is not finished: ${why}`, ...(outcome.details ?? []), nextLine("fathom run")].join("\n"));
