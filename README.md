@@ -188,14 +188,19 @@ against the same file, so design and review share one source.
 | Technical design | `create-tdd` |
 | Structure outline | `create-structure-outline` |
 | Worktree | `setup-worktree` |
-| Implementation | `implement-outline` (runs `review-loop` per phase on request) |
+| Implementation | `implement-outline` (runs `review-loop` on the phases the outline marks for review) |
 | Implementation, direct | `implement-decisions` (from a decisions document) |
+| Review | `review-loop` (Codex reviews, a sub-agent fixes, until clean) |
 | Pull request | `describe-pr` |
 
 The skills are one plugin, so every name carries its prefix: `/kl:create-tdd`
 in Claude Code, `kl:create-tdd` in Codex. Each document has an `iterate-`
 skill. `kl:keylight` shows this table and where the current task stands. In
 Claude Code the workflow skills run only when invoked by name.
+
+Two skills come from outside this repository and are used by name:
+`grilling`, the first step of the `direct` workflow, and `code-review`, the
+two-axis review that `review-loop` hands to Codex.
 
 **One definition, referenced.** Anything two skills need lives once and is
 reached by a relative link: `../keylight/TASKS.md` (task folders, document

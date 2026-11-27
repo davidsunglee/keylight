@@ -69,7 +69,7 @@ steps:
     in: worktree
     phases: decisions
   review:
-    skill: review-loop
+    skill: kl:review-loop
     session: headless
     in: worktree
     prompt: |

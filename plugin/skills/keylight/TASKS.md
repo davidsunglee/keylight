@@ -41,8 +41,9 @@ Staged documents are numbered in the order they were written: `NN-<kind>-<descri
 | `tdd` | Technical design |
 | `structure-outline` | Phased implementation outline |
 | `decisions` | What a grilling conversation settled, for work implemented without a design stage |
+| `review-prompt` | What a review of the implementation is aimed at |
 
-The folder also holds un-numbered files: `task.md` and any ticket text (the ask), `pr-description.md`, and HTML artifacts.
+The folder also holds un-numbered files: `task.md` and any ticket text (the ask), `pr-description.md`, and HTML artifacts. `review-loop/` holds the rounds of each review.
 
 **`scratch.md` is not an input.** It holds the visuals shown during conversations ([`SCRATCH.md`](SCRATCH.md)); skip it when a skill tells you to read the task folder.
 

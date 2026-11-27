@@ -42,7 +42,7 @@ Record where the phase starts: add `Starting commit: <hash>`, from `git rev-pars
 
 Decide now whether the phase gets a review, as step 3 describes.
 
-Then dispatch an `outline-implementer` sub-agent for the phase. Give it the paths to the documents and say which phase to implement. For a phase that gets a review, add the last paragraph of the example: the implementer writes the review prompt, because it knows the intent behind the change.
+Then dispatch an `outline-implementer` sub-agent for the phase. Give it the paths to the documents and say which phase to implement. For a phase that gets a review, add the last paragraph of the example: the implementer writes the review prompt, because it knows the intent behind the change. Its guide is [`../review-loop/REVIEW-PROMPT.md`](../review-loop/REVIEW-PROMPT.md).
 
 Example prompt:
 ```
@@ -72,9 +72,9 @@ IMPORTANT — keep your prompt short. The implementer reads the documents itself
 
 ### 3. Review the phase when the outline calls for it
 
-The outline decides which phases get a review: normally in the phase's `#### Review`, sometimes in its overview. Run the `review-loop` skill on the committed phase when the outline calls for it, or the user asked for reviews. Where the outline is silent about a phase, the decision is yours, by the review rule in [`../create-structure-outline/SKILL.md`](../create-structure-outline/SKILL.md).
+The outline decides which phases get a review: normally in the phase's `#### Review`, sometimes in its overview. Run the `kl:review-loop` skill on the committed phase when the outline calls for it, or the user asked for reviews. Where the outline is silent about a phase, the decision is yours, by the review rule in [`../create-structure-outline/SKILL.md`](../create-structure-outline/SKILL.md).
 
-Give `review-loop` the review prompt the implementer wrote, the boundary `phase-N`, the phase's starting commit as the fixed point, and the task folder's `store` path as its artifact directory. `review-loop` commits its own fixes and ends clean, or stops at one of its gates and puts the question to the human. The phase goes on once the review is clean.
+Give it the review prompt the implementer wrote, the boundary `phase-N`, the phase's starting commit as the fixed point, and the task folder's `store` path as its artifact directory. The review commits its own fixes and ends clean, or stops at one of its gates and puts the question to the human. The phase goes on once the review is clean.
 
 ### 4. Settle the phase's manual checks
 
@@ -108,7 +108,7 @@ Pick up at the first phase whose title has no ✅. That phase may be partly done
 - no starting commit under its title: it has not begun
 - unchecked automated checkboxes: the implementer did not finish, so dispatch it again
 - `git status --short` lists changes: it is implemented and not yet committed
-- otherwise it is committed. Where it gets a review, the task folder's `review-loop/phase-N/` shows how far that went: no folder means the review has not started, and it is finished when the latest round's `findings.json` has the verdict `clean`. Running `review-loop` on the same boundary continues an unfinished one.
+- otherwise it is committed. Where it gets a review, the task folder's `review-loop/phase-N/` shows how far that went: no folder means the review has not started, and it is finished when the latest round's `findings.json` has the verdict `clean`. Running `kl:review-loop` on the same boundary continues an unfinished one.
 
 ### Handling Issues
 
