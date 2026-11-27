@@ -1,4 +1,3 @@
-#!/usr/bin/env bun
 // The artifact viewer: serves one artifact root over loopback HTTP.
 
 import {
@@ -12,8 +11,6 @@ import {
   watch,
 } from "node:fs";
 import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
-import type { Config } from "../cli/config";
-import { TaskError } from "../cli/task";
 import { EMBED_SANDBOX, escapeHtml, IMAGE_EXT, type OutlineItem, renderMarkdown, urlPath } from "./render";
 import { loadThemes, type ThemeSet, themeCss } from "./themes";
 
@@ -25,6 +22,16 @@ const MERMAID_DIR = join(MERMAID_PACKAGE, "dist");
 const PAGE_CSP =
   "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
   "img-src 'self' data: https:; font-src 'self' data:; frame-src 'self'; object-src 'none'; base-uri 'none'";
+
+export interface ViewerOptions {
+  /** Real path of the artifact root. Nothing outside it is ever served. */
+  root: string;
+  port: number;
+  /** Base URL that printed links use. Its host is accepted alongside loopback. */
+  publicUrl: string | null;
+  /** Holds theme.conf and the themes directory. */
+  configDir: string;
+}
 
 export interface Viewer {
   /** Ends open event streams and file watches, then stops listening. */
@@ -46,15 +53,14 @@ interface WatchedThemes {
   close(): void;
 }
 
-/** Serves `config.root` on loopback at `config.port` until stopped. */
-export function startViewer(config: Config): Viewer {
-  if (!existsSync(config.root)) throw new TaskError(`artifact root does not exist: ${config.root}`);
+/** Serves `options.root`, which must exist, on loopback at `options.port` until stopped. */
+export function startViewer(options: ViewerOptions): Viewer {
   const allowedHosts = new Set(["localhost", "127.0.0.1", "[::1]"]);
-  if (config.publicUrl) allowedHosts.add(new URL(config.publicUrl).hostname);
-  const site: Site = { root: config.root, allowedHosts, themes: watchThemes(config.configDir), streams: new Set() };
+  if (options.publicUrl) allowedHosts.add(new URL(options.publicUrl).hostname);
+  const site: Site = { root: options.root, allowedHosts, themes: watchThemes(options.configDir), streams: new Set() };
   const server = Bun.serve({
     hostname: "127.0.0.1",
-    port: config.port,
+    port: options.port,
     idleTimeout: 0, // Event streams stay open.
     fetch: (req) =>
       handle(site, req).catch((err) => {
@@ -641,12 +647,4 @@ function serveRaw(site: Site, abs: string): Response {
   // even when opened in their own tab.
   if (/html|xml/.test(file.type)) headers["content-security-policy"] = `sandbox ${EMBED_SANDBOX}`;
   return new Response(file, { headers });
-}
-
-if (import.meta.main) {
-  // ensureServer starts a detached viewer by running this file, which serves as `keylight serve` does. Imported
-  // here, not at the top, because cli/commands imports this module.
-  void import("../cli/commands").then(async ({ runCommand }) => {
-    process.exitCode = await runCommand(["serve", ...process.argv.slice(2)]);
-  });
 }

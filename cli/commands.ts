@@ -207,6 +207,7 @@ async function scratch({ config, argv, named }: Invocation): Promise<number> {
 }
 
 function serve({ config }: Invocation): number {
+  if (!existsSync(config.root)) throw new TaskError(`artifact root does not exist: ${config.root}`);
   const viewer = startViewer(config);
   console.log(`keylight viewer: ${localUrl(config)}  (root: ${config.root})`);
   if (config.publicUrl) console.log(`public links: ${config.publicUrl}`);
@@ -299,7 +300,8 @@ async function ensureServer(config: Config): Promise<ViewerProblem | null> {
   }
   const log = join(tmpdir(), `keylight-viewer-${config.port}.log`);
   const args = [
-    join(import.meta.dir, "..", "viewer", "server.ts"),
+    join(import.meta.dir, "keylight.ts"),
+    "serve",
     "--root",
     config.root,
     "--port",
