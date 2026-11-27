@@ -49,13 +49,16 @@ After implementing the phase:
 1. Run all automated verification commands listed in the Validation section
 2. Fix any issues before marking checkboxes complete
 3. Update the outline
-4. Report back:
+4. When your prompt says the phase gets a review, write the review prompt to the path that `keylight task next review-prompt phase-[N]-<description>` prints. Follow the `REVIEW-PROMPT.md` your prompt points to, and put the phase's starting commit in the front matter as `base`.
+5. Report back:
    ```
    Phase [N]: automated verification passed
    - [List automated checks that passed]
 
    Manual verification left for the human:
    - [The phase's manual verification items, or "none"]
+
+   Review prompt: [its path, or "none"]
    ```
 
 Leave committing to whoever dispatched you. Task documents are outside the repository and never part of a commit.

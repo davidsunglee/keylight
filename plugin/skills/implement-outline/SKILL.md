@@ -38,7 +38,11 @@ For each phase:
 
 ### 1. Dispatch the implementer
 
-Note the current commit (`git rev-parse HEAD`) as the phase's starting point, then dispatch an `outline-implementer` sub-agent for the phase. Give it the paths to the documents and say which phase to implement.
+Record where the phase starts: add `Starting commit: <hash>`, from `git rev-parse HEAD`, on its own line under the phase title in the outline. It is the fixed point of the phase's review, and it tells a resumed session the phase has begun. After a rebase, replace it with the rebased commit.
+
+Decide now whether the phase gets a review, as step 3 describes.
+
+Then dispatch an `outline-implementer` sub-agent for the phase. Give it the paths to the documents and say which phase to implement. For a phase that gets a review, add the last paragraph of the example: the implementer writes the review prompt, because it knows the intent behind the change.
 
 Example prompt:
 ```
@@ -54,6 +58,8 @@ The outline describes intent and signatures — use your judgment to write the a
 Structure outline takes precedence over the other documents if they conflict.
 Focus only on Phase [N]. Stop after completing automated verification.
 Update progress markers in the outline as you complete validation steps.
+
+This phase gets a review. Write the review prompt as your last step, following /absolute/path/to/review-loop/REVIEW-PROMPT.md. The phase's starting commit is [hash].
 ```
 
 IMPORTANT — keep your prompt short. The implementer reads the documents itself. Do not duplicate the outline contents in your prompt.
@@ -68,7 +74,7 @@ IMPORTANT — keep your prompt short. The implementer reads the documents itself
 
 The outline decides which phases get a review: normally in the phase's `#### Review`, sometimes in its overview. Run the `review-loop` skill on the committed phase when the outline calls for it, or the user asked for reviews. Where the outline is silent about a phase, the decision is yours, by the review rule in [`../create-structure-outline/SKILL.md`](../create-structure-outline/SKILL.md).
 
-The review's boundary is the phase (`phase-N`) and its fixed point is the starting commit you noted in step 1. `review-loop` commits its own fixes and ends clean, or stops at one of its gates and puts the question to the human. The phase goes on once the review is clean.
+Give `review-loop` the review prompt the implementer wrote, the boundary `phase-N`, the phase's starting commit as the fixed point, and the task folder's `store` path as its artifact directory. `review-loop` commits its own fixes and ends clean, or stops at one of its gates and puts the question to the human. The phase goes on once the review is clean.
 
 ### 4. Settle the phase's manual checks
 
@@ -85,7 +91,7 @@ Manual checks come last, so the human checks the phase as it will stand, review 
   **Please check:**
   - [Each unchecked manual item from the outline]
   ```
-  When the human confirms, check the items off. When they report a problem, dispatch the implementer again with what they found, then repeat from step 2.
+  When the human confirms, check the items off. When they report a problem, note the current commit, dispatch the implementer again with what they found, and commit its fix. Where the review rule calls for a review of the fix, run it under its own boundary, `phase-N-fix`, with that commit as the fixed point, so it starts its own round count. Then return to this step.
 
 A manual check that states its own condition ("inspect the screenshots that differ") needs the human only when the condition holds. When it does not hold, check the item off and add a few words saying why.
 
@@ -99,9 +105,10 @@ Mark the phase title ✅, then go on to the next phase without waiting.
 
 Pick up at the first phase whose title has no ✅. That phase may be partly done, so work out how far it got and continue from that step:
 
-- its automated checkboxes are checked: it is implemented
-- `git log` holds its commit: it is committed
-- the task folder's `review-loop/phase-N/` exists: its review started, and is finished when the latest round's `findings.json` has the verdict `clean`. Running `review-loop` on the same boundary continues an unfinished one.
+- no starting commit under its title: it has not begun
+- unchecked automated checkboxes: the implementer did not finish, so dispatch it again
+- `git status --short` lists changes: it is implemented and not yet committed
+- otherwise it is committed. Where it gets a review, the task folder's `review-loop/phase-N/` shows how far that went: no folder means the review has not started, and it is finished when the latest round's `findings.json` has the verdict `clean`. Running `review-loop` on the same boundary continues an unfinished one.
 
 ### Handling Issues
 
