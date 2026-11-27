@@ -24,7 +24,8 @@ workflows:
 #             FATHOM_WORKTREE and FATHOM_BASE are set)
 #   prompt    text added to the opening message; {{ task }}, {{ dir }},
 #             {{ store }}, {{ worktree }}, {{ base }} and {{ skills }} are filled in
-#   confirm   false: continue after an interactive step without asking
+#   confirm   false: when an interactive session ends, count the step as
+#             finished and continue without asking
 steps:
   research-questions:
     skill: fathom:create-research-questions

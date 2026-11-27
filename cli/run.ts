@@ -291,7 +291,20 @@ function logFile(ctx: Context, name: string): string {
 }
 
 /** Run one step. Returns null when it completed, or why it did not. */
-async function runStep(name: string, ctx: Context, dryRun: boolean): Promise<string | null> {
+type Outcome = "done" | "done-stop" | "open" | { problem: string };
+
+/**
+ * A document on disk does not prove an interactive step is finished: its skill
+ * writes a skeleton first. Only the person who quit the session knows.
+ */
+function askFinished(name: string, next: string | undefined): "done" | "done-stop" | "open" {
+  const choices = next ? `Enter = yes, start ${next} · s = yes, stop here · n = not yet` : "Enter = yes · n = not yet";
+  const answer = prompt(`\nThe ${name} session ended. Is ${name} finished?  ${choices}:`)?.trim().toLowerCase();
+  if (answer === undefined || answer.startsWith("n")) return "open";
+  return next && (answer.startsWith("s") || answer.startsWith("q")) ? "done-stop" : "done";
+}
+
+async function runStep(name: string, ctx: Context, dryRun: boolean, next: string | undefined): Promise<Outcome> {
   const { state, workflows, config } = ctx;
   const step = workflows.steps[name]!;
   const mark = (status: StepState["status"], more: Partial<StepState> = {}) => {
@@ -301,18 +314,18 @@ async function runStep(name: string, ctx: Context, dryRun: boolean): Promise<str
 
   if (step.run === "worktree") {
     console.log(`\n${bold(`▸ ${name}`)}  ${dim("code")}`);
-    if (dryRun) return null;
+    if (dryRun) return "done";
     const worktree = setupWorktree(currentRepo(state.checkout), config, ctx.task);
     for (const note of worktree.notes) console.log(`  ${note}`);
     state.worktree = worktree.path;
     state.base = worktree.base;
     mark("done");
-    return null;
+    return "done";
   }
 
   const launch = launchFor(workflows, state.profile, name);
   const inWorktree = step.in === "worktree";
-  if (inWorktree && !state.worktree && !dryRun) return `it runs in the task's worktree, and the worktree step has not run`;
+  if (inWorktree && !state.worktree && !dryRun) return { problem: `it runs in the task's worktree, and the worktree step has not run` };
   const cwd = inWorktree ? (state.worktree ?? "<worktree>") : state.checkout;
   const values = {
     task: ctx.task,
@@ -333,7 +346,7 @@ async function runStep(name: string, ctx: Context, dryRun: boolean): Promise<str
     console.log(dim(`  in ${cwd}`));
     const settings = Object.entries(subagents).map(([key, value]) => `${key}=${value} `).join("");
     console.log(`  ${settings}${shellQuote(session.argv)}`);
-    return null;
+    return "done";
   }
 
   mark("started", { harness: launch.harness, session: session.id });
@@ -341,18 +354,22 @@ async function runStep(name: string, ctx: Context, dryRun: boolean): Promise<str
   if (step.session === "headless" && launch.harness === "claude") {
     const log = logFile(ctx, name);
     const result = await runClaudeHeadless(session.argv, cwd, env, log);
-    if (!result.ok) return `${result.why}\n  Full log: ${log}\n  Look into it:  cd ${cwd} && claude --resume ${session.id}`;
+    if (!result.ok) return { problem: `${result.why}\n  Full log: ${log}\n  Look into it:  cd ${cwd} && claude --resume ${session.id}` };
   } else {
     const headless = step.session === "headless";
     const child = Bun.spawn(session.argv, { cwd, env, stdio: [headless ? "ignore" : "inherit", "inherit", "inherit"] });
     const code = await child.exited;
-    if (headless && code !== 0) return `the session exited with status ${code}`;
+    if (headless && code !== 0) return { problem: `the session exited with status ${code}` };
   }
 
   const problem = unmet(step, ctx, cwd);
-  if (problem) return problem;
+  if (problem) return { problem };
+  const asks = step.session === "interactive" && step.confirm !== false && process.stdin.isTTY;
+  const answer = asks ? askFinished(name, next) : "done";
+  // Left as started, so the next run resumes this session instead of moving on.
+  if (answer === "open") return "open";
   mark("done");
-  return null;
+  return answer;
 }
 
 function context(config: Config, workflows: Workflows, options: RunOptions): Context {
@@ -395,20 +412,19 @@ export async function runWorkflow(config: Config, workflows: Workflows, options:
       if (!(err instanceof ConfigError)) throw err;
       console.error(`fathom: keeping the settings already loaded: ${err.message}`);
     }
-    const problem = await runStep(name, ctx, options.dryRun ?? false);
-    if (problem) {
-      console.error(`\nfathom: ${name} is not finished: ${problem}\nContinue from this step:  fathom run`);
+    const next = index < last ? steps[index + 1] : undefined;
+    const outcome = await runStep(name, ctx, options.dryRun ?? false, next);
+    if (typeof outcome === "object") {
+      console.error(`\nfathom: ${name} is not finished: ${outcome.problem}\nContinue from this step:  fathom run`);
       return 1;
     }
-    const next = steps[index + 1];
-    const step = ctx.workflows.steps[name]!;
-    if (options.dryRun || !next || index === last) continue;
-    if (step.session === "interactive" && step.confirm !== false && process.stdin.isTTY) {
-      const answer = prompt(`\n${name} is done. Enter starts ${next}; q stops here:`);
-      if (answer === null || answer.trim().toLowerCase().startsWith("q")) {
-        console.log(`Stopped before ${next}. Continue:  fathom run`);
-        return 0;
-      }
+    if (outcome === "open") {
+      console.log(`${name} is left open. Come back to it:  fathom run`);
+      return 0;
+    }
+    if (outcome === "done-stop") {
+      console.log(`Stopped before ${next}. Continue:  fathom run`);
+      return 0;
     }
   }
   if (!options.dryRun) console.log(`\n${last === steps.length - 1 ? `${ctx.task}: the ${ctx.state.workflow} workflow is complete.` : `Stopped after ${steps[last]}.`}`);

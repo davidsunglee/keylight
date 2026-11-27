@@ -84,9 +84,11 @@ fathom status                         # the steps and how far they are
 - **Headless steps** run unattended and the next step starts when they end:
   research questions, research, implementation from decisions, review, pull
   request. Messages and tool calls are shown as they happen.
-- **Interactive steps** are ordinary sessions. Quitting one hands back to the
-  runner, which asks before starting the next step (`confirm: false` on the
-  step turns the question off). An interrupted one is resumed, not restarted.
+- **Interactive steps** are ordinary sessions. When you quit one, the runner
+  asks whether the step is finished: yes and start the next, yes and stop, or
+  not yet. "Not yet" keeps the step open, and the next `fathom run` resumes the
+  same Claude Code session (a Codex step starts a new one). `confirm: false`
+  on the step skips the question.
 - **A step is finished when its evidence is there**: its document exists, or
   every phase heading in the decisions document carries ✅, or its `check`
   command passes. Otherwise the runner stops and says what is missing.
