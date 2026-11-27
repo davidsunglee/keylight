@@ -6,6 +6,7 @@
 import { closeSync, existsSync, mkdirSync, openSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative, resolve, sep } from "node:path";
+import type { Subprocess } from "bun";
 import { urlPath } from "../viewer/render";
 import { startViewer } from "../viewer/server";
 import { type Config, flag, loadConfig, localUrl } from "./config";
@@ -286,6 +287,8 @@ interface ViewerProblem {
   fix?: string;
 }
 
+const INTERRUPTS = ["SIGINT", "SIGTERM"] as const;
+
 /** Returns null when the viewer is running. */
 async function ensureServer(config: Config): Promise<ViewerProblem | null> {
   const running = await ping(config);
@@ -313,16 +316,33 @@ async function ensureServer(config: Config): Promise<ViewerProblem | null> {
     config.publicUrl ?? "",
   ];
   const out = openSync(log, "a");
+  let child: Subprocess;
   try {
-    const child = Bun.spawn([process.execPath, ...args], { stdio: ["ignore", out, out], detached: true });
+    child = Bun.spawn([process.execPath, ...args], { stdio: ["ignore", out, out], detached: true });
     child.unref();
   } finally {
     closeSync(out);
   }
-  for (let i = 0; i < 40; i++) {
-    await Bun.sleep(100);
-    if (await ping(config)) return null;
+  // Until the viewer answers, no `keylight stop` can find it, so an interrupt
+  // ends it here before this process dies by the same signal.
+  const interrupted = (signal: NodeJS.Signals) => {
+    child.kill();
+    release();
+    process.kill(process.pid, signal);
+  };
+  const release = () => {
+    for (const signal of INTERRUPTS) process.off(signal, interrupted);
+  };
+  for (const signal of INTERRUPTS) process.on(signal, interrupted);
+  try {
+    for (let i = 0; i < 40; i++) {
+      await Bun.sleep(100);
+      if (await ping(config)) return null;
+    }
+  } finally {
+    release();
   }
+  // Left running: an agent's sandbox can block the ping while the viewer serves.
   return { why: `the viewer could not be reached or started from here. Its log is ${log}.` };
 }
 
