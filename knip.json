@@ -1,13 +1,20 @@
 {
   "$schema": "./node_modules/knip/schema.json",
-  "entry": ["viewer/public/app.js!", "viewer/public/prefs-init.js!", "checks/file-size.ts!"],
+  "entry": [
+    "viewer/public/app.js!",
+    "viewer/public/prefs-init.js!",
+    "checks/file-size.ts!",
+    "cli/test/preload.ts",
+    "**/*.test.ts"
+  ],
+  "includeEntryExports": true,
   "project": [
-    "cli/*.ts!",
-    "viewer/*.ts!",
-    "viewer/public/*.js!",
+    "cli/**/*.ts!",
+    "viewer/**/*.{ts,js}!",
+    "checks/**/*.ts!",
     "cli/test/**/*.ts",
     "viewer/test/**/*.ts",
-    "checks/*.test.ts"
+    "checks/**/*.test.ts"
   ],
   "ignoreDependencies": ["mermaid"],
   "ignoreUnresolved": ["/assets/mermaid/mermaid.esm.min.mjs"],
