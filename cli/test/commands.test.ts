@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { freePort } from "../../viewer/test/support";
 import { runCommand } from "../commands";
@@ -352,6 +351,7 @@ describe.serial("the viewer commands", () => {
 
   test("view starts a detached viewer over the root when none answers, and stop ends it", async () => {
     using repo = tempRepo();
+    using _env = scopedEnv({ TMPDIR: repo.outside });
     const port = String(await freePort());
     try {
       expect(await keylight("view", "--no-open", "--port", port)).toEqual({
@@ -361,8 +361,8 @@ describe.serial("the viewer commands", () => {
       });
       const ping = await (await fetch(`http://127.0.0.1:${port}/__ping`)).json();
       expect(ping).toMatchObject({ app: "keylight-viewer", root: repo.root });
+      expect(existsSync(join(repo.outside, `keylight-viewer-${port}.log`))).toBe(true);
     } finally {
-      rmSync(join(tmpdir(), `keylight-viewer-${port}.log`), { force: true });
       expect((await keylight("stop", "--port", port)).stdout).toBe(`Stopped the viewer for ${repo.root}.\n`);
     }
   });
