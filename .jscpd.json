@@ -1,0 +1,7 @@
+{
+  "path": ["cli", "viewer", "checks"],
+  "format": ["typescript", "javascript", "css"],
+  "ignore": ["**/test/**"],
+  "threshold": 0,
+  "reporters": ["console"]
+}

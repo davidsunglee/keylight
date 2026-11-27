@@ -7,7 +7,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import type { Config } from "./config";
-import { currentRepo, currentTask, linkedTasks, storeOf, TaskError, type Repo } from "./task";
+import { currentRepo, currentTask, linkedTasks, type Repo, storeOf, TaskError } from "./task";
 
 const SCRATCH_FILE = "scratch.md";
 

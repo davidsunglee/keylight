@@ -258,7 +258,7 @@ export function pipedStdin(text: string): Disposable {
 }
 
 /** Runs `action` with console and stream output captured instead of printed. */
-export async function captured(action: () => number | Promise<number>): Promise<Output> {
+async function captured(action: () => number | Promise<number>): Promise<Output> {
   const out: string[] = [];
   const err: string[] = [];
   const saved = {
