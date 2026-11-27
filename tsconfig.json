@@ -9,5 +9,5 @@
     "skipLibCheck": true,
     "types": ["bun"]
   },
-  "include": ["cli/*.ts", "viewer/*.ts", "viewer/test/*.ts"]
+  "include": ["cli/*.ts", "cli/test/**/*.ts", "viewer/*.ts", "viewer/test/**/*.ts", "checks/**/*.ts"]
 }

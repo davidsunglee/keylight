@@ -1,0 +1,10 @@
+[test]
+# Applied to each file the tests load, whenever coverage is collected.
+coverageThreshold = { lines = 0.9, functions = 0.9 }
+coveragePathIgnorePatterns = [
+  # The entry only forwards argv and sets the exit status; a spawned smoke test covers it.
+  "cli/keylight.ts",
+  # Test code and repository checks are not the product being measured.
+  "**/test/**",
+  "checks/**",
+]
