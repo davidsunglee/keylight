@@ -45,6 +45,12 @@ function mermaidFences(file: string): number {
     .filter((t) => t.type === "fence" && t.info.trim().split(/\s+/)[0]?.toLowerCase() === "mermaid").length;
 }
 
+// Diagrams and embeds load only once on screen, which a closed <details> prevents. Each is
+// revealed just before its own check, because opening one panel of a named group closes the rest.
+function reveal(el: Element) {
+  for (let d = el.closest("details"); d; d = d.parentElement?.closest("details") ?? null) d.open = true;
+}
+
 const docs: { file: string; fences: number }[] = [];
 // Newest first, reading only as many files as the selection needs.
 for (const file of findDocs(config.root)
@@ -91,15 +97,11 @@ for (const [i, { file, fences }] of docs.entries()) {
   while (request?.redirectedFrom()) request = request.redirectedFrom();
   const status = (await request?.response())?.status();
   if (status !== 200) issues.push(`HTTP ${status ?? "no response"}`);
-  // Diagrams and embeds load only once on screen, which a closed <details> prevents.
-  await page.evaluate(() => {
-    for (const el of document.querySelectorAll(".mermaid-block, iframe.embed-frame")) {
-      for (let d = el.closest("details"); d; d = d.parentElement?.closest("details") ?? null) d.open = true;
-    }
-  });
+  const disclosures = await page.evaluate(() => [...document.querySelectorAll("details")].map((d) => d.open));
   // Embedded artifacts load lazily, so each frame is scrolled to before its response is checked.
   for (const embed of await page.locator("iframe.embed-frame").all()) {
     const src = await embed.evaluate((el: HTMLIFrameElement) => el.src);
+    await embed.evaluate(reveal);
     await embed.scrollIntoViewIfNeeded();
     const frameStatus =
       frameStatuses.get(src) ??
@@ -109,33 +111,37 @@ for (const [i, { file, fences }] of docs.entries()) {
       ));
     if (frameStatus !== 200) issues.push(`embedded artifact ${src}: HTTP ${frameStatus ?? "no response"}`);
   }
-  const result = await page.evaluate(async () => {
-    const blocks = [...document.querySelectorAll<HTMLElement>(".mermaid-block")];
-    const errors: string[] = [];
-    for (const block of blocks) {
-      block.scrollIntoView();
+  const errors: string[] = [];
+  const blocks = await page.locator(".mermaid-block").all();
+  for (const block of blocks) {
+    await block.evaluate(reveal);
+    const error = await block.evaluate(async (el: HTMLElement) => {
+      el.scrollIntoView();
       const started = Date.now();
-      while (!["done", "error"].includes(block.dataset.state ?? "") && Date.now() - started < 15000) {
+      while (!["done", "error"].includes(el.dataset.state ?? "") && Date.now() - started < 15000) {
         await new Promise((r) => setTimeout(r, 25));
       }
-      if (block.dataset.state !== "done") {
-        errors.push(block.querySelector(".mermaid-error")?.textContent ?? "timed out");
-      }
-    }
+      return el.dataset.state === "done" ? null : (el.querySelector(".mermaid-error")?.textContent ?? "timed out");
+    });
+    if (error !== null) errors.push(error);
+  }
+  // The overflow check and screenshot see the disclosures as the document left them.
+  await page.evaluate((open) => {
+    for (const [i, d] of document.querySelectorAll("details").entries()) d.open = open[i] ?? d.open;
+  }, disclosures);
+  const result = await page.evaluate(() => {
     window.scrollTo(0, 0);
     return {
-      total: blocks.length,
-      errors,
       missingArtifacts: [...document.querySelectorAll(".embed-missing")].map((el) => el.textContent ?? ""),
       // The page itself must never scroll sideways; wide content scrolls inside its own box.
       overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
     };
   });
 
-  const absent = Math.max(0, fences - result.total);
-  diagrams += result.total + absent;
-  failed += result.errors.length + absent;
-  for (const e of result.errors) issues.push(e);
+  const absent = Math.max(0, fences - blocks.length);
+  diagrams += blocks.length + absent;
+  failed += errors.length + absent;
+  for (const e of errors) issues.push(e);
   if (absent) issues.push(`${absent} of ${fences} Mermaid fences rendered no diagram`);
   for (const text of result.missingArtifacts) issues.push(text);
   if (result.overflow > 1) issues.push(`page overflows horizontally by ${result.overflow}px`);

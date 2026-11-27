@@ -1,8 +1,8 @@
 # Folded content
 
-A diagram and an artifact inside closed disclosures.
+A diagram and an artifact inside closed panels of one accordion.
 
-<details><summary>Diagram</summary>
+<details name="folded"><summary>Diagram</summary>
 
 ```mermaid
 flowchart LR
@@ -11,7 +11,7 @@ flowchart LR
 
 </details>
 
-<details><summary>Artifact</summary>
+<details name="folded"><summary>Artifact</summary>
 
 ```task-artifact
 embed.html
