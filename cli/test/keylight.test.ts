@@ -1,6 +1,6 @@
 // The entry as an installed command runs it: a separate process, so these
-// check argv forwarding and the exit status. Everything else is tested
-// in-process through runCommand.
+// check what only a child process shows, such as argv forwarding, the exit
+// status, and the environment and standard input it starts with.
 
 import { describe, expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
@@ -94,9 +94,10 @@ describe.serial("the keylight executable", () => {
   test("serve runs the viewer in the foreground until SIGTERM, then exits 0", async () => {
     using repo = tempRepo();
     const port = await freePort();
+    // The fixture's environment, not the one this run started with.
     const child = Bun.spawn(
       [process.execPath, ENTRY, "serve", "--root", repo.root, "--port", String(port), "--config", repo.configDir],
-      { stdout: "pipe", stderr: "pipe" },
+      { env: { ...process.env }, stdout: "pipe", stderr: "pipe" },
     );
     try {
       await waitFor(() => answers(port), "the viewer to answer");

@@ -1,5 +1,6 @@
 [test]
-# Pins the terminal state for every test file and fails any unscripted prompt.
+# Pins the terminal state for every test file, fails any unscripted prompt, and
+# refuses to run while git is pointed at another repository.
 preload = ["./cli/test/preload.ts"]
 # Applied to each file the tests load, whenever coverage is collected.
 coverageThreshold = { lines = 0.9, functions = 0.9 }
