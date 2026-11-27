@@ -165,10 +165,10 @@ function listDir(root: string, dir: string): Entry[] {
     if (d.name.startsWith(".") || d.name === "node_modules") continue;
     const abs = join(dir, d.name);
     const rel = relative(root, abs);
-    // A symlink that is broken or leaves the root is never served, so it is not listed.
-    if (d.isSymbolicLink() && !locate(root, rel)) continue;
     let stat;
     try {
+      // A symlink that is broken or leaves the root is never served, so it is not listed.
+      if (d.isSymbolicLink() && !locate(root, rel)) continue;
       stat = statSync(abs);
     } catch {
       continue; // Removed since the directory was read.
@@ -361,26 +361,30 @@ interface DocView {
   version: string;
 }
 
-async function docView(root: string, abs: string, entries = listDir(root, dirname(abs))): Promise<DocView> {
+async function docView(root: string, abs: string): Promise<{ view: DocView; entries: Entry[] }> {
   const stat = statSync(abs);
   const rendered = renderMarkdown(await Bun.file(abs).text(), abs, root);
+  // Listed after the read, so a file added during it still appears: the page's
+  // change stream opens only once the response arrives.
+  const entries = listDir(root, dirname(abs));
   return {
-    title: rendered.title,
-    html: rendered.html,
-    files: fileList(entries, relative(root, abs)),
-    outline: outlineList(rendered.outline),
-    version: `${stat.mtimeMs}-${stat.size}`,
+    entries,
+    view: {
+      title: rendered.title,
+      html: rendered.html,
+      files: fileList(entries, relative(root, abs)),
+      outline: outlineList(rendered.outline),
+      version: `${stat.mtimeMs}-${stat.size}`,
+    },
   };
 }
 
 async function docPage(site: Site, abs: string): Promise<string> {
   const rel = relative(site.root, abs);
-  const dir = dirname(abs);
-  const entries = listDir(site.root, dir);
-  const view = await docView(site.root, abs, entries);
+  const { view, entries } = await docView(site.root, abs);
   return shell(site, {
     title: view.title,
-    crumbs: crumbs(rel, readableName(dir, entries)),
+    crumbs: crumbs(rel, readableName(dirname(abs), entries)),
     sidebar:
       `<section><h2>Files</h2><div id="files">${view.files}</div></section>` +
       `<section><h2>On this page</h2><div id="outline">${view.outline}</div></section>`,
@@ -587,7 +591,7 @@ async function serveView(site: Site, abs: string): Promise<Response> {
 
 async function serveFragment(site: Site, abs: string): Promise<Response> {
   if (!isDocument(abs)) return new Response("Not a document", { status: 400 });
-  return Response.json(await docView(site.root, abs), { headers: { "cache-control": "no-store" } });
+  return Response.json((await docView(site.root, abs)).view, { headers: { "cache-control": "no-store" } });
 }
 
 function serveRaw(site: Site, abs: string): Response {
