@@ -14,6 +14,8 @@ export interface OutlineItem {
   level: number;
   text: string;
   id: string;
+  /** The heading folds its section in the document, so the outline folds it too. */
+  foldable: boolean;
 }
 
 export interface Rendered {
@@ -195,7 +197,8 @@ function createMarkdown(): MarkdownIt {
       .join("");
     const id = slugify(text, env.slugs);
     tokens[idx]!.attrSet("id", id);
-    env.outline.push({ level: Number(tokens[idx]!.tag.slice(1)), text, id });
+    const foldable = Boolean(tokens[idx]!.meta?.foldable);
+    env.outline.push({ level: Number(tokens[idx]!.tag.slice(1)), text, id, foldable });
     return self.renderToken(tokens, idx, options);
   };
 
@@ -252,6 +255,43 @@ function createMarkdown(): MarkdownIt {
       tokens[i - 2]!.attrJoin("class", checked ? "task done" : "task");
     }
   });
+
+  // Every top-level section folds: its heading is the summary, and everything
+  // up to the next heading of that level or higher is the body. The top level
+  // is the highest one in use below the title.
+  md.core.ruler.push("foldable-sections", (state) => {
+    const levelOf = (token: Token) => (token.type === "heading_open" && token.level === 0 ? Number(token.tag.slice(1)) : 0);
+    const top = Math.min(...state.tokens.map(levelOf).filter((level) => level > 1));
+    const block = (type: string, tag: string, nesting: 1 | -1): Token => {
+      const token = new state.Token(type, tag, nesting) as Token;
+      token.block = true;
+      return token;
+    };
+    const out: Token[] = [];
+    let open = false;
+    state.tokens.forEach((token, i) => {
+      const level = levelOf(token);
+      if (open && level && level <= top) {
+        out.push(block("section_close", "details", -1));
+        open = false;
+      }
+      if (level === top) {
+        const details = block("section_open", "details", 1);
+        details.attrSet("class", "section");
+        details.attrSet("open", "");
+        out.push(details, block("section_summary_open", "summary", 1));
+        open = true;
+        token.meta = { foldable: true };
+      }
+      out.push(token);
+      if (token.type === "heading_close" && state.tokens[i - 2]?.meta?.foldable) {
+        out.push(block("section_summary_close", "summary", -1));
+      }
+    });
+    if (open) out.push(block("section_close", "details", -1));
+    state.tokens = out;
+  });
+
   const htmlInline = md.renderer.rules.html_inline!;
   md.renderer.rules.html_inline = (tokens, idx, options, env, self) =>
     tokens[idx]!.meta?.trusted ? tokens[idx]!.content : htmlInline(tokens, idx, options, env, self);

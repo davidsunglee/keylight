@@ -253,6 +253,12 @@ diagrams, highlighted code, line-colored diffs, frontmatter, task lists, and
 HTML artifacts embedded inline from `task-artifact` fences. Pages reload when
 the file changes on disk. The layout works on a phone.
 
+Every top-level section folds from its heading (the top level is the highest
+heading level below the title), and its entry in the sidebar's outline folds
+separately. The sidebar hides with the button at the top left or Cmd-B, and
+resizes by dragging its edge (double-click the edge to reset). Folds, the
+sidebar's state and its width are remembered per device.
+
 ```sh
 fathom view                    # task index
 fathom view path/to/03-tdd-x.md

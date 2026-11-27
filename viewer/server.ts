@@ -188,6 +188,16 @@ function entryHref(e: Entry): string {
   return (e.kind === "doc" || e.kind === "dir" ? "/view/" : "/raw/") + urlPath(e.rel);
 }
 
+const SIDEBAR_TOGGLE =
+  '<button type="button" class="sidebar-toggle" id="sidebar-toggle" aria-controls="sidebar" aria-expanded="true" ' +
+  'aria-label="Toggle the sidebar" title="Toggle the sidebar (\u2318B)">' +
+  '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">' +
+  '<rect x="1.75" y="2.75" width="12.5" height="10.5" rx="2"/><path d="M6 2.75v10.5"/></svg></button>';
+
+const SIDEBAR_RESIZER =
+  '<div class="sidebar-resizer" id="sidebar-resizer" role="separator" aria-orientation="vertical" ' +
+  'aria-label="Resize the sidebar" title="Drag to resize, double-click to reset" tabindex="0"></div>';
+
 function shell(opts: { title: string; crumbs: string; sidebar?: string; main: string; docPath?: string }): string {
   const hasSidebar = Boolean(opts.sidebar);
   return `<!doctype html>
@@ -199,17 +209,17 @@ function shell(opts: { title: string; crumbs: string; sidebar?: string; main: st
 <title>${escapeHtml(opts.title)}</title>
 <link rel="stylesheet" href="/assets/app.css">
 <link rel="stylesheet" href="/assets/theme.css" id="theme-css">
-<script src="/assets/theme-init.js"></script>
+<script src="/assets/prefs-init.js"></script>
 <script type="module" src="/assets/app.js"></script>
 </head>
 <body class="${hasSidebar ? "with-sidebar" : "no-sidebar"}"${opts.docPath ? ` data-doc="${escapeHtml(opts.docPath)}"` : ""}>
 <header class="topbar">
-  ${hasSidebar ? '<button class="menu-button" id="menu-button" aria-label="Show files and outline" aria-expanded="false">&#9776;</button>' : ""}
+  ${hasSidebar ? SIDEBAR_TOGGLE : ""}
   <nav class="crumbs" aria-label="Location">${opts.crumbs}</nav>
   <span class="live" id="live" hidden>live</span>
   ${themePicker()}
 </header>
-${hasSidebar ? `<aside class="sidebar" id="sidebar">${opts.sidebar}</aside><div class="scrim" id="scrim"></div>` : ""}
+${hasSidebar ? `<aside class="sidebar" id="sidebar">${opts.sidebar}</aside>${SIDEBAR_RESIZER}<div class="scrim" id="scrim"></div>` : ""}
 <main class="main" id="main">${opts.main}</main>
 </body>
 </html>`;
@@ -251,9 +261,24 @@ function outlineList(outline: OutlineItem[]): string {
   // docs at h3), so show the two highest levels in use below the title.
   const sections = outline.filter((h) => h.level > 1);
   const top = Math.min(...sections.map((h) => h.level));
-  const items = sections
-    .filter((h) => h.level <= top + 1)
-    .map((h) => `<li class="l${h.level - top + 2}"><a href="#${h.id}">${escapeHtml(h.text)}</a></li>`);
+  const shown = sections.filter((h) => h.level <= top + 1);
+  const link = (h: OutlineItem) => `<a href="#${h.id}">${escapeHtml(h.text)}</a>`;
+  const items: string[] = [];
+  for (let i = 0; i < shown.length; ) {
+    const head = shown[i++]!;
+    if (head.level > top) {
+      items.push(`<li class="l3">${link(head)}</li>`);
+      continue;
+    }
+    const under: string[] = [];
+    if (head.foldable) while (shown[i] && shown[i]!.level > top) under.push(`<li class="l3">${link(shown[i++]!)}</li>`);
+    items.push(
+      under.length
+        ? `<li class="l2"><details open><summary><span class="fold-mark" aria-hidden="true"></span>${link(head)}</summary>` +
+            `<ul>${under.join("")}</ul></details></li>`
+        : `<li class="l2">${link(head)}</li>`,
+    );
+  }
   return items.length ? `<ul class="outline">${items.join("")}</ul>` : "";
 }
 

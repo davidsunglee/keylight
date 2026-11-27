@@ -260,21 +260,154 @@ function watchOutline() {
   }
 }
 
-const menuButton = document.getElementById("menu-button");
+/** Keeps a choice on this device; null forgets it. Without storage the choice lasts for this page only. */
+function remember(key, value) {
+  try {
+    if (value === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, value);
+  } catch {
+    // Storage unavailable.
+  }
+}
+
+function remembered(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Keeps which of a container's sections are folded, per document, and returns
+ * a function that folds them again after the container's content is replaced.
+ * `sectionOf` gives the id of the section a <details> folds, if it folds one.
+ */
+function keepFolds(container, key, sectionOf) {
+  if (!container) return () => {};
+  const byDoc = JSON.parse(remembered(key) ?? "{}");
+  const folded = new Set(byDoc[docPath] ?? []);
+  // "toggle" does not bubble, and also fires for sections this script folds,
+  // so read the section's state instead of trusting the event.
+  container.addEventListener(
+    "toggle",
+    (event) => {
+      const id = sectionOf(event.target);
+      if (!id || folded.has(id) === !event.target.open) return;
+      if (event.target.open) folded.delete(id);
+      else folded.add(id);
+      if (folded.size) byDoc[docPath] = [...folded];
+      else delete byDoc[docPath];
+      remember(key, Object.keys(byDoc).length ? JSON.stringify(byDoc) : null);
+    },
+    true,
+  );
+  return () => {
+    for (const details of container.querySelectorAll("details")) {
+      if (folded.has(sectionOf(details))) details.open = false;
+    }
+  };
+}
+
+// The document and the outline fold separately: tidying the outline should not move the page.
+const foldDocument = keepFolds(doc, "fathom-folded", (details) =>
+  details.matches("details.section") ? details.querySelector(":scope > summary > [id]")?.id : undefined,
+);
+const foldOutline = keepFolds(document.getElementById("outline"), "fathom-outline-folded", (details) =>
+  details.querySelector(":scope > summary > a")?.getAttribute("href").slice(1),
+);
+
+/** Opens the folded section around a link's target, since a browser cannot scroll to hidden content. */
+function reveal(hash) {
+  let target = null;
+  try {
+    target = document.getElementById(decodeURIComponent(hash.slice(1)));
+  } catch {
+    // Not a valid fragment.
+  }
+  const section = target?.closest("summary") ? null : target?.closest("details.section:not([open])");
+  if (!section) return;
+  section.open = true;
+  target.scrollIntoView();
+}
+
+document.addEventListener("click", (event) => {
+  const link = event.target.closest('a[href^="#"]');
+  if (link) reveal(link.hash);
+});
+window.addEventListener("hashchange", () => reveal(location.hash));
+
 const sidebar = document.getElementById("sidebar");
+const sidebarToggle = document.getElementById("sidebar-toggle");
+const resizer = document.getElementById("sidebar-resizer");
+// Matches the stylesheet: a column beside the document when wide, a drawer over it when narrow.
+const wide = window.matchMedia("(min-width: 901px)");
+
+function markSidebar() {
+  const shown = wide.matches ? root.dataset.sidebar !== "collapsed" : document.body.classList.contains("drawer-open");
+  sidebarToggle?.setAttribute("aria-expanded", String(shown));
+}
 
 function setDrawer(open) {
   document.body.classList.toggle("drawer-open", open);
-  menuButton?.setAttribute("aria-expanded", String(open));
+  markSidebar();
 }
 
-menuButton?.addEventListener("click", () => setDrawer(!document.body.classList.contains("drawer-open")));
+function setCollapsed(collapsed) {
+  if (collapsed) root.dataset.sidebar = "collapsed";
+  else delete root.dataset.sidebar;
+  remember("fathom-sidebar", collapsed ? "collapsed" : null);
+  markSidebar();
+}
+
+function toggleSidebar() {
+  if (wide.matches) setCollapsed(root.dataset.sidebar !== "collapsed");
+  else setDrawer(!document.body.classList.contains("drawer-open"));
+}
+
+sidebarToggle?.addEventListener("click", toggleSidebar);
 document.getElementById("scrim")?.addEventListener("click", () => setDrawer(false));
 sidebar?.addEventListener("click", (event) => {
   if (event.target.closest("a")) setDrawer(false);
 });
+wide.addEventListener("change", () => setDrawer(false));
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") setDrawer(false);
+  const chord = (event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey;
+  if (sidebar && chord && event.key.toLowerCase() === "b") {
+    event.preventDefault();
+    toggleSidebar();
+  }
+});
+markSidebar();
+
+const SIDEBAR_WIDTHS = { min: 180, max: 640, step: 16 };
+
+function setSidebarWidth(px) {
+  const width = Math.round(Math.min(SIDEBAR_WIDTHS.max, Math.max(SIDEBAR_WIDTHS.min, px)));
+  root.style.setProperty("--sidebar-width", `${width}px`);
+  remember("fathom-sidebar-width", String(width));
+}
+
+resizer?.addEventListener("pointerdown", (event) => {
+  if (event.button !== 0) return;
+  event.preventDefault();
+  resizer.setPointerCapture(event.pointerId);
+  document.body.classList.add("resizing");
+});
+resizer?.addEventListener("pointermove", (event) => {
+  if (resizer.hasPointerCapture(event.pointerId)) setSidebarWidth(event.clientX);
+});
+resizer?.addEventListener("lostpointercapture", () => document.body.classList.remove("resizing"));
+resizer?.addEventListener("dblclick", () => {
+  root.style.removeProperty("--sidebar-width");
+  remember("fathom-sidebar-width", null);
+});
+resizer?.addEventListener("keydown", (event) => {
+  const direction = { ArrowLeft: -1, ArrowRight: 1 }[event.key];
+  if (!direction) return;
+  event.preventDefault();
+  setSidebarWidth(sidebar.offsetWidth + direction * SIDEBAR_WIDTHS.step);
 });
 
 // The pick is kept per device: a phone and a laptop can differ, and "Auto"
@@ -293,12 +426,7 @@ function markTheme() {
 function pickTheme(name) {
   if (name) root.dataset.theme = name;
   else delete root.dataset.theme;
-  try {
-    if (name) localStorage.setItem("fathom-theme", name);
-    else localStorage.removeItem("fathom-theme");
-  } catch {
-    // Storage unavailable: the pick lasts for this page only.
-  }
+  remember("fathom-theme", name || null);
   markTheme();
   recolorDiagrams();
 }
@@ -329,6 +457,8 @@ function reloadThemeCss() {
 darkQuery.addEventListener("change", () => recolorDiagrams());
 
 function decorate() {
+  foldDocument();
+  foldOutline();
   scanDiagrams();
   addCopyButtons();
   watchOutline();
@@ -373,3 +503,4 @@ filter?.addEventListener("input", () => {
 });
 
 decorate();
+if (location.hash) reveal(location.hash);

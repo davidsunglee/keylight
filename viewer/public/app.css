@@ -13,7 +13,9 @@
 :root {
   --font-sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  /* The width picked by dragging; the sidebar never takes more than half the window. */
   --sidebar-width: 272px;
+  --sidebar-space: min(var(--sidebar-width), 50vw);
   --topbar-height: 44px;
 
   --theme-kind: light;
@@ -173,18 +175,27 @@ a:hover {
   letter-spacing: 0.02em;
 }
 
-.menu-button {
-  display: none;
+.sidebar-toggle,
+.theme-button {
   flex: none;
-  width: 36px;
-  height: 36px;
-  margin-left: -8px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
   border: 0;
   border-radius: 8px;
   background: none;
-  color: var(--fg);
-  font-size: 18px;
+  color: var(--muted);
   cursor: pointer;
+}
+
+.sidebar-toggle:hover,
+.theme-button:hover {
+  background: var(--surface-strong);
+}
+
+.sidebar-toggle {
+  margin-left: -8px;
 }
 
 .sidebar {
@@ -193,7 +204,7 @@ a:hover {
   bottom: 0;
   left: 0;
   z-index: 20;
-  width: var(--sidebar-width);
+  width: var(--sidebar-space);
   padding: 18px 12px 32px 16px;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -276,9 +287,78 @@ a:hover {
   font-size: 13px;
 }
 
-.outline a.current {
+.outline a.current,
+.outline details:not([open]):has(a.current) > summary a {
   color: var(--accent);
   font-weight: 600;
+}
+
+/* The mark sits in the sidebar's padding, so a folding entry lines up with the rest. */
+.outline summary {
+  display: flex;
+  margin-left: -16px;
+  list-style: none;
+}
+
+.outline summary::-webkit-details-marker {
+  display: none;
+}
+
+.outline summary a {
+  flex: 1;
+  margin-left: -8px;
+}
+
+.fold-mark {
+  position: relative;
+  z-index: 1;
+  flex: none;
+  display: grid;
+  place-items: center end;
+  width: 24px;
+  padding-right: 4px;
+  cursor: pointer;
+}
+
+.fold-mark::before {
+  width: 6px;
+  height: 7px;
+}
+
+.sidebar-resizer {
+  position: fixed;
+  top: var(--topbar-height);
+  bottom: 0;
+  left: calc(var(--sidebar-space) - 4px);
+  z-index: 21;
+  width: 8px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.sidebar-resizer::after {
+  content: "";
+  position: absolute;
+  inset: 0 3px;
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.sidebar-resizer:hover::after,
+.sidebar-resizer:focus-visible::after,
+.resizing .sidebar-resizer::after {
+  opacity: 1;
+}
+
+.sidebar-resizer:focus-visible {
+  outline: 0;
+}
+
+.resizing {
+  cursor: col-resize;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .scrim {
@@ -291,7 +371,19 @@ a:hover {
 }
 
 .with-sidebar .main {
-  margin-left: var(--sidebar-width);
+  margin-left: var(--sidebar-space);
+}
+
+/* Below this width the sidebar is a drawer, which has its own open and closed. */
+@media (min-width: 901px) {
+  [data-sidebar="collapsed"] .sidebar,
+  [data-sidebar="collapsed"] .sidebar-resizer {
+    display: none;
+  }
+
+  [data-sidebar="collapsed"] .with-sidebar .main {
+    margin-left: 0;
+  }
 }
 
 /* ---------------------------------------------------------- document */
@@ -307,7 +399,8 @@ a:hover {
   overflow-wrap: break-word;
 }
 
-.doc > :first-child {
+.doc > :first-child,
+.doc > .section:first-child > summary > :first-child {
   margin-top: 0;
 }
 
@@ -401,7 +494,11 @@ a:hover {
   border-top: 1px solid var(--border);
 }
 
-.doc hr + h2 {
+/* A rule written above a section replaces the section's own. Inside a folded
+   section the rule is hidden, so the next heading keeps its own. */
+.doc hr + h2,
+.doc hr + .section > summary > h2,
+.doc .section[open]:has(> hr:last-child) + .section > summary > h2 {
   margin-top: 0;
   padding-top: 0;
   border-top: 0;
@@ -418,6 +515,44 @@ a:hover {
   background: var(--surface-strong);
   font: 0.86em var(--font-mono);
   overflow-wrap: anywhere;
+}
+
+/* Foldable sections */
+
+.section > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.section > summary::-webkit-details-marker {
+  display: none;
+}
+
+/* The disclosure triangle, here and in the outline. */
+.section > summary > ::before,
+.fold-mark::before {
+  content: "";
+  background: var(--muted);
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+  transition: transform 0.12s;
+}
+
+.section[open] > summary > ::before,
+.outline [open] > summary > .fold-mark::before {
+  transform: rotate(90deg);
+}
+
+.section > summary:hover > ::before,
+.fold-mark:hover::before {
+  background: var(--fg);
+}
+
+/* In the document it hangs in the margin, so the heading stays aligned with the others. */
+.section > summary > ::before {
+  display: inline-block;
+  width: 0.45em;
+  height: 0.55em;
+  margin: 0 0.3em 0 -0.75em;
 }
 
 /* Frontmatter */
@@ -872,20 +1007,7 @@ a.chip:hover {
 /* ------------------------------------------------------- theme picker */
 
 .theme-button {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
   margin-right: -6px;
-  border: 0;
-  border-radius: 8px;
-  background: none;
-  cursor: pointer;
-}
-
-.theme-button:hover {
-  background: var(--surface-strong);
 }
 
 /* A half-filled circle: the usual mark for appearance settings. */
@@ -989,8 +1111,14 @@ a.chip:hover {
     font-size: 16px;
   }
 
-  .menu-button {
-    display: block;
+  .sidebar-toggle,
+  .theme-button {
+    width: 36px;
+    height: 36px;
+  }
+
+  .sidebar-resizer {
+    display: none;
   }
 
   .with-sidebar .main {
@@ -1077,11 +1205,6 @@ a.chip:hover {
     height: 70vh;
   }
 
-  .theme-button {
-    width: 36px;
-    height: 36px;
-  }
-
   .theme-menu {
     font-size: 15px;
   }
@@ -1097,7 +1220,10 @@ a.chip:hover {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sidebar {
+  .sidebar,
+  .sidebar-resizer::after,
+  .section > summary > ::before,
+  .fold-mark::before {
     transition: none;
   }
 }
@@ -1105,6 +1231,7 @@ a.chip:hover {
 @media print {
   .topbar,
   .sidebar,
+  .sidebar-resizer,
   .copy {
     display: none;
   }

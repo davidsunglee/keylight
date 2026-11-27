@@ -32,7 +32,7 @@ if (theme !== undefined || argv.includes("--menu")) {
 
 const at = flag(argv, "at");
 if (at) await page.locator(at).first().scrollIntoViewIfNeeded();
-if (argv.includes("--drawer")) await page.click("#menu-button");
+if (argv.includes("--drawer")) await page.click("#sidebar-toggle");
 // Give visible diagrams time to draw.
 await page
   .waitForFunction(() => {
