@@ -5,12 +5,17 @@
     "viewer/public/prefs-init.js!",
     "checks/file-size.ts!",
     "cli/test/preload.ts",
+    "cli/test/check-harness.ts",
+    "viewer/test/check-browser.ts",
+    "viewer/test/render-check.ts",
+    "viewer/test/shot.ts",
     "**/*.test.ts"
   ],
   "includeEntryExports": true,
   "project": [
     "cli/**/*.ts!",
-    "viewer/**/*.{ts,js}!",
+    "viewer/**/*.ts!",
+    "viewer/public/**/*.js!",
     "checks/**/*.ts!",
     "cli/test/**/*.ts",
     "viewer/test/**/*.ts",
