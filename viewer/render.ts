@@ -72,7 +72,8 @@ export function urlPath(rel: string): string {
  * Map a reference written in a document to a path relative to the root.
  * Handles relative paths, absolute paths inside the root, and the
  * `.humanlayer/tasks/<slug>/file` style, where the file lives beside the
- * document. Returns null when the target is outside the root.
+ * document. Returns null when the target is missing or its path is outside
+ * the root. Containment is checked on the path, without following symlinks.
  */
 function resolveRef(ref: string, env: Env): string | null {
   let path = ref.trim();
@@ -286,7 +287,7 @@ function createMarkdown(): MarkdownIt {
   return md;
 }
 
-/** Where the viewer serves a link's local target, or null when the target is missing or outside the root. */
+/** Where the viewer would serve a link's local target, or null when `resolveRef` finds none. */
 function viewerHref(href: string, env: Env): string | null {
   const [path = "", fragment] = href.split("#");
   const rel = resolveRef(path, env);

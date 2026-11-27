@@ -305,6 +305,7 @@ describe.serial("the viewer commands", () => {
     const missing = join(repo.outside, "missing");
     const refused = { code: 1, stdout: "", stderr: `keylight: artifact root does not exist: ${missing}\n` };
     expect(await keylight("url", "--root", missing)).toEqual(refused);
+    expect(await keylight("serve", "--root", missing)).toEqual(refused);
     using _env = scopedEnv({ KEYLIGHT_ROOT: missing });
     expect(await keylight("view", "--no-open")).toEqual(refused);
     expect(existsSync(missing)).toBe(false);

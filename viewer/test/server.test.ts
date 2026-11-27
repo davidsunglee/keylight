@@ -72,10 +72,12 @@ function buildFixture() {
   mkdirSync(join(outside, "dir"), { recursive: true });
   writeFileSync(join(outside, "secret.md"), "# Secret");
   writeFileSync(join(outside, "dir", "secret.txt"), "secret");
+  writeFileSync(join(outside, "dir", "notes.md"), "# Outside notes");
   plant(0, {
     "keylight/add-gates/01-research-gates.md": RESEARCH,
     "keylight/add-gates/02-tdd-gates.md": "# TDD gates\n\n### Early\n\n## Design\n\n### Shape\n",
     "keylight/add-gates/page.html": "<p>artifact</p>",
+    "keylight/add-gates/page.xhtml": '<html xmlns="http://www.w3.org/1999/xhtml"></html>',
     "keylight/add-gates/chart.svg": "<svg></svg>",
     "keylight/add-gates/pic.png": "png",
     "keylight/add-gates/notes.txt": "not listed",
@@ -89,6 +91,7 @@ function buildFixture() {
   plant(0, { "node_modules/pkg/README.md": "# Dependency\n", "top.md": "# At the root\n" });
   symlinkSync(join(outside, "dir"), join(root, "keylight", "escape"));
   symlinkSync(join(outside, "dir", "secret.txt"), join(root, "keylight", "add-gates", "secret.txt"));
+  symlinkSync(join(outside, "secret.md"), join(root, "keylight", "add-gates", "secret.md"));
   symlinkSync(join(base, "nowhere"), join(root, "keylight", "add-gates", "broken.md"));
 }
 
@@ -146,6 +149,7 @@ async function openEvents(
 ): Promise<AsyncDisposable & { res: Response; until(pattern: string): Promise<string> }> {
   const abort = new AbortController();
   const res = await get(path, { signal: abort.signal });
+  expect(res.status).toBe(200);
   const reader = res.body?.getReader();
   if (!reader) throw new Error("the event stream has no body");
   return {
@@ -263,22 +267,35 @@ describe("the index", () => {
 describe("the viewer's own routes", () => {
   test("/__ping names the app and its root", async () => {
     const res = await get("/__ping");
+    expect([res.status, res.headers.get("content-type")]).toEqual([200, "application/json;charset=utf-8"]);
     expect(await res.json()).toEqual({ app: "keylight-viewer", root, pid: expect.any(Number) });
   });
 
   test("/assets/theme.css is generated from the config directory's themes", async () => {
     const res = await get("/assets/theme.css");
+    expect(res.status).toBe(200);
     expect(headersOf(res)).toMatchObject({ "content-type": "text/css; charset=utf-8", "cache-control": "no-store" });
     expect(await res.text()).toBe(themeCss(loadThemes(configDir)));
   });
 
   test("/assets/ serves the viewer's files and Mermaid's, and nothing beside them", async () => {
     const app = await get("/assets/app.css");
-    expect(app.headers.get("cache-control")).toBe("no-cache");
+    expect(app.status).toBe(200);
+    expect(headersOf(app)).toMatchObject({ "content-type": "text/css;charset=utf-8", "cache-control": "no-cache" });
     expect(await app.text()).toBe(readFileSync(join(import.meta.dir, "..", "public", "app.css"), "utf8"));
+    const script = await get("/assets/app.js");
+    expect(script.status).toBe(200);
+    expect(headersOf(script)).toMatchObject({
+      "content-type": "text/javascript;charset=utf-8",
+      "cache-control": "no-cache",
+    });
+    await script.arrayBuffer();
     const mermaid = await get("/assets/mermaid/mermaid.min.js");
     expect(mermaid.status).toBe(200);
-    expect(mermaid.headers.get("cache-control")).toBe("public, max-age=604800");
+    expect(headersOf(mermaid)).toMatchObject({
+      "content-type": "text/javascript;charset=utf-8",
+      "cache-control": "public, max-age=604800",
+    });
     await mermaid.arrayBuffer();
     for (const path of [
       "/assets/nope.js",
@@ -342,7 +359,7 @@ describe("documents and directories", () => {
     expect(await text(`/view/keylight/${OPAQUE}`)).toContain("<h1>cache-layer</h1>");
   });
 
-  test("/view/ lists a directory, with or without a trailing slash", async () => {
+  test("/view/ lists a directory, with or without a trailing slash, and nothing a symlink takes outside the root", async () => {
     const body = await text("/view/keylight/");
     expect(body).toContain('<body class="no-sidebar">');
     const rows = [...body.matchAll(/<li><a href="([^"]+)"><span class="label">([^<]+)<\/span>/g)].map((m) => [
@@ -353,7 +370,6 @@ describe("documents and directories", () => {
       [`/view/keylight/${OPAQUE}`, `${OPAQUE}/`],
       ["/view/keylight/add-gates", "add-gates/"],
       ["/view/keylight/empty", "empty/"],
-      ["/view/keylight/escape", "escape/"],
       ["/view/keylight/older", "older/"],
     ]);
     expect(await text("/view/keylight")).toBe(body);
@@ -368,13 +384,19 @@ describe("documents and directories", () => {
 
   test("/frag/ returns a document's parts for a live refresh, and refuses anything else", async () => {
     const res = await get(`/frag/${doc}`);
-    expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(res.status).toBe(200);
+    expect(headersOf(res)).toMatchObject({
+      "content-type": "application/json;charset=utf-8",
+      "cache-control": "no-store",
+    });
     const frag = (await res.json()) as Record<string, string>;
     const page = await text(`/view/${doc}`);
     expect(Object.keys(frag)).toEqual(["title", "html", "files", "outline", "version"]);
     expect(frag.title).toBe("Research gates");
     for (const part of [frag.html, frag.files, frag.outline]) expect(page).toContain(part ?? "missing");
-    const early = (await (await get("/frag/keylight/add-gates/02-tdd-gates.md")).json()) as Record<string, string>;
+    const earlyRes = await get("/frag/keylight/add-gates/02-tdd-gates.md");
+    expect(earlyRes.status).toBe(200);
+    const early = (await earlyRes.json()) as Record<string, string>;
     expect(early.outline).toBe(
       '<ul class="outline"><li class="l3"><a href="#early">Early</a></li><li class="l2"><details open><summary>' +
         '<span class="fold-mark" aria-hidden="true"></span><a href="#design">Design</a></summary>' +
@@ -388,7 +410,12 @@ describe("documents and directories", () => {
 
   test("/raw/ serves a file as it is, and sends a directory to /view/", async () => {
     const res = await get("/raw/keylight/add-gates/pic.png");
-    expect(headersOf(res)).toMatchObject({ "cache-control": "no-store", "x-content-type-options": "nosniff" });
+    expect(res.status).toBe(200);
+    expect(headersOf(res)).toMatchObject({
+      "content-type": "image/png",
+      "cache-control": "no-store",
+      "x-content-type-options": "nosniff",
+    });
     expect(res.headers.get("content-security-policy")).toBeNull();
     expect(await res.text()).toBe("png");
     expect(await text(`/raw/${doc}`)).toBe(RESEARCH);
@@ -397,10 +424,14 @@ describe("documents and directories", () => {
     expect(dir.headers.get("location")).toBe("/view/keylight/add-gates");
   });
 
-  test("/raw/ sandboxes HTML and SVG artifacts in their own tab, as the embed frame does", async () => {
-    for (const name of ["page.html", "chart.svg"]) {
+  test("/raw/ sandboxes HTML, XHTML and SVG artifacts in their own tab, as the embed frame does", async () => {
+    for (const [name, type] of [
+      ["page.html", "text/html;charset=utf-8"],
+      ["page.xhtml", "application/xhtml+xml"],
+      ["chart.svg", "image/svg+xml"],
+    ]) {
       const res = await get(`/raw/keylight/add-gates/${name}`);
-      expect(res.status).toBe(200);
+      expect([name, res.status, res.headers.get("content-type")]).toEqual([name, 200, type]);
       expect(res.headers.get("content-security-policy")).toBe(`sandbox ${EMBED_SANDBOX}`);
       await res.text();
     }
@@ -414,6 +445,7 @@ describe("documents and directories", () => {
     try {
       const res = await get("/view/keylight/older/01-prd-older.md");
       expect([res.status, await res.text()]).toEqual([500, "Internal error"]);
+      expect(logged).toHaveBeenCalledTimes(1);
     } finally {
       chmodSync(unreadable, 0o644);
       logged.mockRestore();
@@ -430,6 +462,7 @@ describe("containment", () => {
       "keylight/escape/secret.txt",
       "keylight/escape",
       "keylight/add-gates/secret.txt",
+      "keylight/add-gates/secret.md",
       "keylight/add-gates/broken.md",
       "keylight/add-gates/missing.md",
     ];
@@ -445,8 +478,12 @@ describe("containment", () => {
   });
 
   test("names the missing path on the 404 page, escaped, or the raw path when it cannot be decoded", async () => {
-    expect(await (await get("/view/%3Cb%3Ex.md")).text()).toContain("<code>&lt;b&gt;x.md</code>");
-    expect(await (await get("/raw/%E0%A4")).text()).toContain("<code>/raw/%E0%A4</code>");
+    const named = await get("/view/%3Cb%3Ex.md");
+    expect(named.status).toBe(404);
+    expect(await named.text()).toContain("<code>&lt;b&gt;x.md</code>");
+    const undecodable = await get("/raw/%E0%A4");
+    expect(undecodable.status).toBe(404);
+    expect(await undecodable.text()).toContain("<code>/raw/%E0%A4</code>");
   });
 
   test("watches nothing outside the root", async () => {
@@ -506,11 +543,16 @@ describe("startViewer", () => {
   test("stop ends open event streams and frees the port", async () => {
     const at = await freePort();
     const other = startViewer(configFor({ port: at }));
-    const res = await fetch(`http://127.0.0.1:${at}/events`);
-    const reader = res.body?.getReader();
-    if (!reader) throw new Error("the event stream has no body");
-    await readUntil(reader, "retry");
-    await other.stop();
+    let reader: ReadableStreamDefaultReader<Uint8Array>;
+    try {
+      const res = await fetch(`http://127.0.0.1:${at}/events`);
+      const body = res.body?.getReader();
+      if (!body) throw new Error("the event stream has no body");
+      reader = body;
+      await readUntil(reader, "retry");
+    } finally {
+      await other.stop();
+    }
     const ended = await Promise.race([
       reader.read().then(
         (chunk) => chunk.done,
