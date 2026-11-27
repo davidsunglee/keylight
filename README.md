@@ -2,8 +2,7 @@
 
 A personal research → design → outline → implement workflow for coding agents
 (Claude Code, Codex, later Pi), built around rich design artifacts on local
-disk. It replaces the parts of HumanLayer worth keeping: the workflow skills
-and the artifact viewer.
+disk.
 
 ## Layout
 
