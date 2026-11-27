@@ -97,6 +97,7 @@ function buildFixture() {
   symlinkSync(join(outside, "dir", "secret.txt"), join(root, "keylight", "add-gates", "secret.txt"));
   symlinkSync(join(outside, "secret.md"), join(root, "keylight", "add-gates", "secret.md"));
   symlinkSync(join(base, "nowhere"), join(root, "keylight", "add-gates", "broken.md"));
+  symlinkSync("loop.md", join(root, "keylight", "add-gates", "loop.md"));
 }
 
 let port = 0;
@@ -492,6 +493,24 @@ describe("containment", () => {
     const undecodable = await get("/raw/%E0%A4");
     expect(undecodable.status).toBe(404);
     expect(await undecodable.text()).toContain("<code>/raw/%E0%A4</code>");
+  });
+
+  test("a path that names no file, by a symlink loop, an overlong name or a NUL, is a 404 on every route", async () => {
+    for (const rel of ["keylight/add-gates/loop.md", `${"x".repeat(300)}.md`, "x%00.md"]) {
+      for (const prefix of ["/view/", "/frag/", "/raw/"]) {
+        const res = await get(prefix + rel);
+        expect([prefix + rel, res.status]).toEqual([prefix + rel, 404]);
+        await res.text();
+      }
+      const watched = await get(`/events?path=${rel}`);
+      expect([rel, watched.status]).toEqual([rel, 404]);
+      await watched.text();
+    }
+    for (const path of [`/assets/${"x".repeat(300)}.js`, "/assets/x%00.js"]) {
+      const res = await get(path);
+      expect([path, res.status]).toEqual([path, 404]);
+      await res.text();
+    }
   });
 
   test("watches nothing outside the root", async () => {

@@ -1,11 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import MarkdownIt from "markdown-it";
 import type Token from "markdown-it/lib/token.mjs";
 
 const root = join(import.meta.dir, "..");
 const pluginDir = join(root, "plugin");
+const realPluginDir = realpathSync(pluginDir);
 
 function readJson(path: string): Record<string, unknown> {
   return JSON.parse(readFileSync(join(root, path), "utf8"));
@@ -29,12 +30,28 @@ function linkTargets(markdown: string): string[] {
 const EXTERNAL = /^([a-z][a-z0-9+.-]*:|\/\/|#)/i;
 const TEMPLATE_PLACEHOLDER = /^\{[A-Za-z_]+\}$/;
 
+function linkPath(target: string): string {
+  const path = target.replace(/[?#].*$/, "");
+  try {
+    return decodeURIComponent(path);
+  } catch {
+    return path; // A % that starts no escape is part of the file name.
+  }
+}
+
 function linkProblem(file: string, target: string): string | undefined {
   if (EXTERNAL.test(target) || TEMPLATE_PLACEHOLDER.test(target)) return undefined;
-  const path = resolve(dirname(file), decodeURIComponent(target.replace(/[?#].*$/, "")));
-  // Codex installs a copy of plugin/, so a link that leaves it breaks once installed.
+  const path = resolve(dirname(file), linkPath(target));
+  // Codex installs a copy of plugin/, so a link that leaves it, as written or
+  // through a symlink, breaks once installed.
   if (!path.startsWith(pluginDir + sep)) return "leaves plugin/";
-  if (!existsSync(path)) return "does not exist";
+  let real: string;
+  try {
+    real = realpathSync(path);
+  } catch {
+    return "does not exist";
+  }
+  if (!real.startsWith(realPluginDir + sep)) return "leaves plugin/";
   return undefined;
 }
 

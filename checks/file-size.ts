@@ -38,6 +38,20 @@ function lineCount(bytes: Buffer): number {
   return bytes[bytes.length - 1] === 0x0a ? lines : lines + 1;
 }
 
+/** A tracked path's working-tree content, or undefined when it has none to measure. */
+function workingContent(path: string): Buffer | undefined {
+  const abs = join(root, path);
+  try {
+    // A symlink or a submodule has no file content of its own.
+    return lstatSync(abs).isFile() ? readFileSync(abs) : undefined;
+  } catch (error) {
+    // Deleted from the working tree, or under a directory since replaced by a file.
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === "ENOENT" || code === "ENOTDIR") return undefined;
+    throw error;
+  }
+}
+
 function kilobytes(bytes: number): string {
   return `${(bytes / 1024).toFixed(1)} KB`;
 }
@@ -48,14 +62,13 @@ const problems: string[] = [];
 
 for (const path of tracked) {
   if (generated.has(path)) continue;
-  // A tracked path deleted from the working tree, a symlink, or a submodule has no file content to measure.
-  const stats = lstatSync(join(root, path), { throwIfNoEntry: false });
-  if (!stats?.isFile()) continue;
-  if (stats.size > MAX_BYTES) {
-    problems.push(`${path}: ${kilobytes(stats.size)}, above the ${kilobytes(MAX_BYTES)} limit`);
+  const content = workingContent(path);
+  if (content === undefined) continue;
+  if (content.length > MAX_BYTES) {
+    problems.push(`${path}: ${kilobytes(content.length)}, above the ${kilobytes(MAX_BYTES)} limit`);
   }
   if (SOURCE_FILE.test(path)) {
-    const lines = lineCount(readFileSync(join(root, path)));
+    const lines = lineCount(content);
     if (lines > MAX_SOURCE_LINES) problems.push(`${path}: ${lines} lines, above the ${MAX_SOURCE_LINES}-line limit`);
   }
 }
