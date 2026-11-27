@@ -233,7 +233,8 @@ codex plugin add kl@keylight
 
 Update with `git pull` in the checkout, then `bun install` if `bun.lock`
 changed. The wrapper and the Claude Code link run from the checkout, so the
-next command and session use the update. Codex installs a copy of `plugin/`.
+next command and session use the update. Reload any open viewer tab, so its
+diagrams load the installed Mermaid. Codex installs a copy of `plugin/`.
 After a pull or a skill change, refresh the copy:
 
 ```sh

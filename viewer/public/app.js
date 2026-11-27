@@ -34,7 +34,7 @@ const svgCache = new Map(); // diagram source -> rendered SVG
 const sources = new WeakMap(); // diagram block -> its source
 
 function loadMermaid() {
-  mermaidReady ??= import("/assets/mermaid/mermaid.esm.min.mjs").then(({ default: mermaid }) => {
+  mermaidReady ??= import(document.body.dataset.mermaid).then(({ default: mermaid }) => {
     configureMermaid(mermaid);
     return mermaid;
   });
