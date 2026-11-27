@@ -4,11 +4,15 @@
   "private": true,
   "type": "module",
   "description": "A research, design, outline and implement workflow for coding agents, with a local artifact viewer.",
+  "packageManager": "bun@1.4.5",
   "bin": {
     "keylight": "./cli/keylight.ts"
   },
   "scripts": {
-    "check": "tsc -p .",
+    "check": "bun run --parallel --no-exit-on-error 'gate:*'",
+    "gate:types": "tsc -p .",
+    "gate:tests": "bun test",
+    "gate:file-size": "bun checks/file-size.ts",
     "serve": "bun cli/keylight.ts serve",
     "parity": "bun viewer/test/parity.ts",
     "shot": "bun viewer/test/shot.ts"
@@ -19,8 +23,10 @@
     "mermaid": "11"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.6.9",
     "@types/bun": "^1.4.5",
     "@types/markdown-it": "^14.2.0",
-    "playwright": "1"
+    "playwright": "1",
+    "typescript": "7.0.2"
   }
 }
