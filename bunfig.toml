@@ -7,6 +7,8 @@ coverageThreshold = { lines = 0.9, functions = 0.9 }
 coveragePathIgnorePatterns = [
   # The entry only forwards argv and sets the exit status; a spawned smoke test covers it.
   "cli/keylight.ts",
+  # ask reads the terminal directly; cli/test/say.test.ts covers it in subprocesses.
+  "cli/say.ts",
   # Test code and repository checks are not the product being measured.
   "**/test/**",
   "checks/**",
