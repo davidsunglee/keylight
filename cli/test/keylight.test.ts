@@ -115,6 +115,6 @@ describe.serial("the keylight executable", () => {
     using repo = tempRepo();
     const missing = join(repo.outside, "missing");
     const result = await spawnKeylight(["serve", "--root", missing, "--port", String(await freePort())]);
-    expect(result).toEqual({ code: 1, stdout: "", stderr: `Artifact root does not exist: ${missing}\n` });
+    expect(result).toEqual({ code: 1, stdout: "", stderr: `keylight: artifact root does not exist: ${missing}\n` });
   });
 });

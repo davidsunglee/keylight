@@ -30,6 +30,14 @@ if (overridden.length) {
     `run the tests from the repository root with ${overridden.join(", ")} unset, so .env.test keeps git from reading your own settings`,
   );
 }
+// A run started inside a keylight session inherits that session's settings
+// (KEYLIGHT_STEP, KEYLIGHT_ROOT and the rest). Removed so that no test reads
+// them in this process; a child started without an explicit environment
+// still receives them.
+for (const name of Object.keys(process.env)) {
+  if (name.startsWith("KEYLIGHT_")) delete process.env[name];
+}
+
 const redirects = ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_COMMON_DIR"];
 const configOverrides = ["GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS"];
 const set = [...redirects, ...configOverrides].filter((name) => process.env[name]);
