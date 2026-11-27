@@ -1,4 +1,4 @@
-# fathom
+# keylight
 
 A personal research → design → outline → implement workflow for coding agents
 (Claude Code, Codex, later Pi), built around rich design artifacts on local
@@ -8,14 +8,14 @@ and the artifact viewer.
 ## Layout
 
 ```text
-fathom/
-├── cli/        # the `fathom` command: workflow runner, task folders, viewer links
+keylight/
+├── cli/        # the `keylight` command: workflow runner, task folders, viewer links
 ├── viewer/     # local artifact viewer
-└── plugin/     # the `fathom` plugin, installed in Claude Code and Codex
+└── plugin/     # the `kl` plugin, installed in Claude Code and Codex
     ├── .claude-plugin/  .codex-plugin/   # one manifest per tool
     ├── LICENSE, NOTICE  # the skills derive from HumanLayer's Apache-2.0 plugin
     └── skills/          # workflow skills, one directory per skill
-        ├── fathom/     # shared: task-folder conventions, sub-agent briefs,
+        ├── keylight/   # shared: task-folder conventions, sub-agent briefs,
         │               # HTML artifact template; also the overview skill
         ├── show-me/    # visual conventions, used by other skills and on its own
         ├── create-*/   # one per stage, each with its template and final answer
@@ -33,7 +33,7 @@ A task's documents live in one central root, outside any repository, so they
 outlive worktrees and can be backed up as a unit.
 
 ```text
-~/Artifacts/                              # FATHOM_ROOT
+~/Artifacts/                              # KEYLIGHT_ROOT
 └── <repo>/
     └── <task>/
         ├── task.md
@@ -51,19 +51,19 @@ The worktree symlink is ignored through `.git/info/exclude`, never
 `.gitignore`. `<repo>` is the repository's name, shared by all its worktrees.
 
 ```sh
-fathom task                     # the task linked here, and its files
-fathom task new <task>          # create it (or reuse it) and link it here
-fathom task list                # tasks stored for this repository
-fathom task next tdd <slug>     # path for the next numbered document
-fathom scratch                  # the task's scratch page (see Workflows)
+keylight task                     # the task linked here, and its files
+keylight task new <task>          # create it (or reuse it) and link it here
+keylight task list                # tasks stored for this repository
+keylight task next tdd <slug>     # path for the next numbered document
+keylight scratch                  # the task's scratch page (see Workflows)
 ```
 
 A shared checkout can have several tasks linked; name one with `--task <task>`
-or `FATHOM_TASK`.
+or `KEYLIGHT_TASK`.
 
 ## Workflows
 
-`fathom run` takes a task through a workflow, one fresh session per step. It
+`keylight run` takes a task through a workflow, one fresh session per step. It
 is a plain loop: start the step's session, wait for it to end, check what the
 step was meant to leave behind, start the next. No model decides the order.
 
@@ -74,12 +74,12 @@ step was meant to leave behind, start the next. No model decides the order.
 | `direct` | grill → worktree → implement-decisions → review → pr |
 
 ```sh
-fathom start COR-310                  # seed from a Linear ticket (needs LINEAR_API_KEY), then run
-fathom start "what to build" --workflow direct
-fathom run                            # continue from the first unfinished step
-fathom run --from tdd                 # go back to a step: continues its session (--fresh starts it over)
-fathom run --from tdd --until tdd     # one step; --dry-run prints the commands instead
-fathom status                         # the steps and how far they are
+keylight start COR-310                  # seed from a Linear ticket (needs LINEAR_API_KEY), then run
+keylight start "what to build" --workflow direct
+keylight run                            # continue from the first unfinished step
+keylight run --from tdd                 # go back to a step: continues its session (--fresh starts it over)
+keylight run --from tdd --until tdd     # one step; --dry-run prints the commands instead
+keylight status                         # the steps and how far they are
 ```
 
 - **Headless steps** run unattended and the next step starts when they end:
@@ -87,22 +87,22 @@ fathom status                         # the steps and how far they are
   request. Messages and tool calls are shown as they happen.
 - **Interactive steps** are ordinary sessions. When you quit one, the runner
   asks whether the step is finished: yes and start the next, yes and stop, or
-  not yet. "Not yet" keeps the step open, and the next `fathom run` resumes the
+  not yet. "Not yet" keeps the step open, and the next `keylight run` resumes the
   same Claude Code session (a Codex step starts a new one). `confirm: false`
   on the step skips the question.
 - **A step is finished when its evidence is there**: its document exists, or
   every phase heading in the decisions document carries ✅, or its `check`
   command passes. Otherwise the runner stops and says what is missing.
-- **The worktree step is code**, not a session. `fathom worktree` runs it by
+- **The worktree step is code**, not a session. `keylight worktree` runs it by
   hand.
 
-Run it in a Rex tab per task: `rex run -- fathom run`.
+Run it in a Rex tab per task: `rex run -- keylight run`.
 
 ### Workflows, steps and profiles
 
 The built-in definitions are in [`cli/workflows.yaml`](cli/workflows.yaml),
 which documents every field. Override any part in
-`~/.config/fathom/workflows.yaml`. A **profile** says how each step's session
+`~/.config/keylight/workflows.yaml`. A **profile** says how each step's session
 is launched, so the model and reasoning effort are chosen once, not per session:
 
 ```yaml
@@ -129,7 +129,7 @@ Text you would otherwise paste goes in a file, and the runner or the skill
 delivers it. The repository's copy wins over your personal one:
 
 ```text
-<repo>/.fathom/prompts/<name>.md      then      ~/.config/fathom/prompts/<name>.md
+<repo>/.keylight/prompts/<name>.md      then      ~/.config/keylight/prompts/<name>.md
 ```
 
 | File | Delivered |
@@ -138,7 +138,7 @@ delivers it. The repository's copy wins over your personal one:
 | `<step>.<gate>.md`, e.g. `tdd.system-design.md` | when the session reaches that gate |
 
 A **gate** is a point inside a step where the skill runs
-`fathom gate <step> <gate>` and carries out what it prints, as a message from
+`keylight gate <step> <gate>` and carries out what it prints, as a message from
 you delivered at that moment. The default text ships with each skill as
 `gate-<gate>.md`:
 
@@ -160,13 +160,13 @@ that belongs in a conversation message, the session adds it to the task's
 **scratch page** and puts the link in the message:
 
 ```sh
-fathom scratch < entry.md     # add an entry at the top of scratch.md, print its link
-fathom scratch                # just the link, to open before a session
+keylight scratch < entry.md     # add an entry at the top of scratch.md, print its link
+keylight scratch                # just the link, to open before a session
 ```
 
 Keep the page open beside the session; it reloads as entries arrive, newest
 first. Text shapes (call trees, file trees, diffs, pseudocode) stay in the
-message. The rule lives in `plugin/skills/fathom/SCRATCH.md` and is referenced by
+message. The rule lives in `plugin/skills/keylight/SCRATCH.md` and is referenced by
 `show-me`, `create-tdd`, `iterate-tdd`, `create-prd`, `iterate-prd` and the
 `grill` step. Later stages skip `scratch.md` when they read the task folder.
 With no task linked, the page goes to `<root>/<repo>/scratch/`.
@@ -192,15 +192,15 @@ against the same file, so design and review share one source.
 | Implementation, direct | `implement-decisions` (from a decisions document) |
 | Pull request | `describe-pr` |
 
-The skills are one plugin, so every name carries its prefix: `/fathom:create-tdd`
-in Claude Code, `fathom:create-tdd` in Codex. Each document has an `iterate-`
-skill. `fathom:fathom` shows this table and where the current task stands. In
+The skills are one plugin, so every name carries its prefix: `/kl:create-tdd`
+in Claude Code, `kl:create-tdd` in Codex. Each document has an `iterate-`
+skill. `kl:keylight` shows this table and where the current task stands. In
 Claude Code the workflow skills run only when invoked by name.
 
 **One definition, referenced.** Anything two skills need lives once and is
-reached by a relative link: `../fathom/TASKS.md` (task folders, document
-naming, formatting rules), `../fathom/SUBAGENTS.md` and `../fathom/agents/`
-(sub-agent briefs), `../fathom/HTML-ARTIFACTS.md` (HTML pages and their
+reached by a relative link: `../keylight/TASKS.md` (task folders, document
+naming, formatting rules), `../keylight/SUBAGENTS.md` and `../keylight/agents/`
+(sub-agent briefs), `../keylight/HTML-ARTIFACTS.md` (HTML pages and their
 template), `../show-me/SKILL.md` (visual conventions). An `iterate-` skill
 reuses its `create-` skill's final answer. The links resolve because the
 plugin keeps the skills as sibling directories.
@@ -215,36 +215,36 @@ registered with Claude Code or Codex, and the same brief works in both.
 bun install
 
 # The command: a wrapper in any directory on PATH.
-printf '#!/bin/sh\nexec bun %s/cli/fathom.ts "$@"\n' "$PWD" > ~/.local/bin/fathom
-chmod +x ~/.local/bin/fathom
+printf '#!/bin/sh\nexec bun %s/cli/keylight.ts "$@"\n' "$PWD" > ~/.local/bin/keylight
+chmod +x ~/.local/bin/keylight
 
-# Claude Code: one link. The plugin loads from the repository, so edits apply
-# to the next session.
-ln -s "$PWD/plugin" ~/.claude/skills/fathom
+# Claude Code: one link, named for the skill prefix. The plugin loads from the
+# repository, so edits apply to the next session.
+ln -s "$PWD/plugin" ~/.claude/skills/kl
 
 # Codex: register the repository as a marketplace, then install from it.
 codex plugin marketplace add "$PWD"
-codex plugin add fathom@fathom
+codex plugin add kl@keylight
 ```
 
 Codex installs a copy of `plugin/`. After changing a skill, refresh the copy:
 
 ```sh
-codex plugin remove fathom@fathom && codex plugin add fathom@fathom
+codex plugin remove kl@keylight && codex plugin add kl@keylight
 ```
 
-`claude plugin disable fathom@skills-dir` and `codex plugin remove fathom@fathom`
+`claude plugin disable kl@skills-dir` and `codex plugin remove kl@keylight`
 turn the plugin off without touching the repository.
 
 The agent must be able to write to the artifact root, which is outside the
 worktree:
 
-- **Sessions started by `fathom run`** are given the task's folder
+- **Sessions started by `keylight run`** are given the task's folder
   automatically, and the runner starts the viewer first.
 - **Claude Code, by hand:** add the root to `permissions.additionalDirectories`.
 - **Codex, by hand:** add it to `sandbox_workspace_write.writable_roots`.
-  Codex's sandbox also blocks local network, so `fathom url` prints the link
-  without being able to start the viewer; keep one running (`fathom view`).
+  Codex's sandbox also blocks local network, so `keylight url` prints the link
+  without being able to start the viewer; keep one running (`keylight view`).
 
 ## Viewer
 
@@ -260,20 +260,20 @@ resizes by dragging its edge (double-click the edge to reset). Folds, the
 sidebar's state and its width are remembered per device.
 
 ```sh
-fathom view                    # task index
-fathom view path/to/03-tdd-x.md
-fathom url  path/to/03-tdd-x.md   # print the link only (what skills call)
-fathom stop
+keylight view                    # task index
+keylight view path/to/03-tdd-x.md
+keylight url  path/to/03-tdd-x.md   # print the link only (what skills call)
+keylight stop
 ```
 
 A path may go through a worktree symlink; it resolves to the same link.
 
 | Setting | Flag | Environment | Default |
 | --- | --- | --- | --- |
-| Artifact root | `--root` | `FATHOM_ROOT` | `~/Artifacts` |
-| Port | `--port` | `FATHOM_PORT` | `4747` |
-| Base URL for printed links | `--public-url` | `FATHOM_PUBLIC_URL` | `http://localhost:<port>` |
-| Config directory (themes) | `--config` | `FATHOM_CONFIG` | `~/.config/fathom` |
+| Artifact root | `--root` | `KEYLIGHT_ROOT` | `~/Artifacts` |
+| Port | `--port` | `KEYLIGHT_PORT` | `4747` |
+| Base URL for printed links | `--public-url` | `KEYLIGHT_PUBLIC_URL` | `http://localhost:<port>` |
+| Config directory (themes) | `--config` | `KEYLIGHT_CONFIG` | `~/.config/keylight` |
 
 ### Themes
 
@@ -284,7 +284,7 @@ other color, including diagram colors, in the stylesheet. Hues are adjusted
 only as far as needed to stay readable on the background.
 
 ```text
-~/.config/fathom/
+~/.config/keylight/
 ├── themes/<name>     # one theme per file; symlinks are fine
 ├── theme.conf        # light = <name> / dark = <name>
 └── custom.css        # optional: override any CSS variable by hand
@@ -300,16 +300,16 @@ only as far as needed to stay readable on the background.
 `viewer/integrations/theme.zsh` connects this to the Theme utility in
 `~/.config/theme`: it links every slug's Ghostty theme into `themes/` and
 writes `theme.conf` from Theme's state. Add the function to `apply.zsh` and
-call `_theme_write_fathom` from `_theme_propagate`.
+call `_theme_write_keylight` from `_theme_propagate`.
 
 ### On a phone
 
 The viewer listens on loopback only. To reach it from another device, put it
-behind Tailscale and tell fathom the address so printed links use it:
+behind Tailscale and tell keylight the address so printed links use it:
 
 ```sh
 tailscale serve --bg 4747
-export FATHOM_PUBLIC_URL=https://<machine>.<tailnet>.ts.net
+export KEYLIGHT_PUBLIC_URL=https://<machine>.<tailnet>.ts.net
 ```
 
 ### Safety

@@ -27,7 +27,7 @@ You fully settle and get the user's sign-off on the System Design before you ope
 
 **Show, don't tell.** Reach for a diagram, type signature, or code-shape sketch instead of paragraphs of prose. A quick diagram communicates more than a wall of text. Keep artifacts up to date as decisions evolve.
 
-**A diagram in a message goes on the scratch page.** The session runs in a terminal, which draws text only. Follow [`../fathom/SCRATCH.md`](../fathom/SCRATCH.md): code-shape sketches stay in the message; a Mermaid diagram or HTML artifact you are showing as an option goes on the task's scratch page, with its link in the message. Once the decision is resolved, the chosen diagram goes into the document as usual.
+**A diagram in a message goes on the scratch page.** The session runs in a terminal, which draws text only. Follow [`../keylight/SCRATCH.md`](../keylight/SCRATCH.md): code-shape sketches stay in the message; a Mermaid diagram or HTML artifact you are showing as an option goes on the task's scratch page, with its link in the message. Once the decision is resolved, the chosen diagram goes into the document as usual.
 
 **Make it read like a document a human designed for other humans.** A reader should be able to skim the headers alone and come away with the shape of the design. Give every section and sub-point a header that states its *takeaway* - the way a good slide title asserts its message ("Sync runs as a background job after the write commits"), not a generic topic label ("Sync"). Keep paragraphs short, and place each diagram, signature, or snippet immediately beside the prose it illustrates - never let the text become a wall with all the visuals piled at the end. Lead with the point, then support it.
 
@@ -35,15 +35,15 @@ You fully settle and get the user's sign-off on the System Design before you ope
 
 **Lenses and gates.** [`lenses-and-gates.md`](lenses-and-gates.md), which you read in step 1, sets three rules for the whole session: judge every recommendation through the repository's **lenses** and write out their guidance, let the ticket's decisions stand, and end each phase at a **gate**.
 
-**Get more context when you need it.** When a decision depends on how the codebase actually works, dispatch sub-agents before presenting options: `codebase-analyzer`, `codebase-pattern-finder`, or `web-search-researcher`, as [`../fathom/SUBAGENTS.md`](../fathom/SUBAGENTS.md) describes. Fold any new findings back into the research artifact.
+**Get more context when you need it.** When a decision depends on how the codebase actually works, dispatch sub-agents before presenting options: `codebase-analyzer`, `codebase-pattern-finder`, or `web-search-researcher`, as [`../keylight/SUBAGENTS.md`](../keylight/SUBAGENTS.md) describes. Fold any new findings back into the research artifact.
 
 ---
 
 <step index="1" name="understand-the-context">
 
 <instructions>
-- Read [`../fathom/TASKS.md`](../fathom/TASKS.md): it covers finding the task folder, naming and formatting documents, and linking them for the user.
-- Run `fathom task` to find the task folder and list its files.
+- Read [`../keylight/TASKS.md`](../keylight/TASKS.md): it covers finding the task folder, naming and formatting documents, and linking them for the user.
+- Run `keylight task` to find the task folder and list its files.
 - Read every relevant file in the task folder **fully**, excluding research-questions docs.
 - Read [`lenses-and-gates.md`](lenses-and-gates.md), then the `CODING_STANDARDS.md` it sends you to.
 - Read the TDD template: [`tdd-template.md`](tdd-template.md).
@@ -65,7 +65,7 @@ There is no required upstream artifact. The product context might be a full PRD,
 <step index="2" name="write-the-skeleton">
 
 <instructions>
-Write the doc to the path that `fathom task next tdd <description>` prints.
+Write the doc to the path that `keylight task next tdd <description>` prints.
 
 **Keep the skeleton as minimal as possible. No preamble, no setup, no summaries.** The faster you reach the first question, the more the user stays engaged in building the TDD. Write only:
 - Frontmatter with `type: design-tdd`, plus the top-level title
@@ -74,7 +74,7 @@ Write the doc to the path that `fathom task next tdd <description>` prints.
 
 Today's reality and the target both get expressed inside the System Design and Program Design during the interview (Steps 3 and 5), so the skeleton itself stays empty.
 
-Then respond immediately by opening the System Design phase with the **first system-design question** - at most one short orienting line carrying the document's link from `fathom url <path>`, then the question. The linked page updates as you re-work the doc, so the user can keep it open beside the conversation. For example:
+Then respond immediately by opening the System Design phase with the **first system-design question** - at most one short orienting line carrying the document's link from `keylight url <path>`, then the question. The linked page updates as you re-work the doc, so the user can keep it open beside the conversation. For example:
 
 > I've started the TDD: http://localhost:4747/view/... First question: should the new sync run inline in the request, or as a background job after the write commits?
 >
@@ -139,7 +139,7 @@ If the codebase uses an ORM or a schema-definition library, the equivalent ORM-s
 
 ## HTML artifacts for complex concepts
 
-When a concept is too complex for Mermaid or plain text - combining data flow, structure, annotations, or side-by-side comparisons - write a focused HTML artifact named `diagram-<description>.html` and embed it in the doc, following [`../fathom/HTML-ARTIFACTS.md`](../fathom/HTML-ARTIFACTS.md). Keep each artifact focused on the decision at hand; use realistic labels, not lorem ipsum.
+When a concept is too complex for Mermaid or plain text - combining data flow, structure, annotations, or side-by-side comparisons - write a focused HTML artifact named `diagram-<description>.html` and embed it in the doc, following [`../keylight/HTML-ARTIFACTS.md`](../keylight/HTML-ARTIFACTS.md). Keep each artifact focused on the decision at hand; use realistic labels, not lorem ipsum.
 </guidance>
 
 </step>
@@ -147,7 +147,7 @@ When a concept is too complex for Mermaid or plain text - combining data flow, s
 <step index="4" name="system-design-review-gate">
 
 <instructions>
-When the cross-component architecture is settled, run the system-design gate, as [`lenses-and-gates.md`](lenses-and-gates.md) describes: `fathom gate tdd system-design`.
+When the cross-component architecture is settled, run the system-design gate, as [`lenses-and-gates.md`](lenses-and-gates.md) describes: `keylight gate tdd system-design`.
 
 Then hand the design back for review. Because you've been fleshing it out section-by-section, the user hasn't read it as a whole yet. Say something like:
 
@@ -257,7 +257,7 @@ The same HTML-artifact escape hatch from the System Design step applies here - u
 <step index="6" name="program-design-review-gate">
 
 <instructions>
-When the program design is settled, run the program-design gate, as [`lenses-and-gates.md`](lenses-and-gates.md) describes: `fathom gate tdd program-design`.
+When the program design is settled, run the program-design gate, as [`lenses-and-gates.md`](lenses-and-gates.md) describes: `keylight gate tdd program-design`.
 
 Then hand the design back for review the same way:
 

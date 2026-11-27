@@ -25,14 +25,14 @@ export function flag(argv: string[], name: string): string | undefined {
 }
 
 export function loadConfig(argv: string[]): Config {
-  const rootInput = flag(argv, "root") ?? process.env.FATHOM_ROOT ?? resolve(homedir(), "Artifacts");
+  const rootInput = flag(argv, "root") ?? process.env.KEYLIGHT_ROOT ?? resolve(homedir(), "Artifacts");
   const rootPath = resolve(rootInput.replace(/^~(?=\/|$)/, homedir()));
-  const port = Number(flag(argv, "port") ?? process.env.FATHOM_PORT ?? 4747);
+  const port = Number(flag(argv, "port") ?? process.env.KEYLIGHT_PORT ?? 4747);
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error(`Invalid port: ${port}`);
-  const publicUrl = (flag(argv, "public-url") ?? process.env.FATHOM_PUBLIC_URL ?? "").replace(/\/+$/, "") || null;
+  const publicUrl = (flag(argv, "public-url") ?? process.env.KEYLIGHT_PUBLIC_URL ?? "").replace(/\/+$/, "") || null;
   const configHome = process.env.XDG_CONFIG_HOME || resolve(homedir(), ".config");
   const configDir = resolve(
-    (flag(argv, "config") ?? process.env.FATHOM_CONFIG ?? resolve(configHome, "fathom")).replace(/^~(?=\/|$)/, homedir()),
+    (flag(argv, "config") ?? process.env.KEYLIGHT_CONFIG ?? resolve(configHome, "keylight")).replace(/^~(?=\/|$)/, homedir()),
   );
   return { root: existsSync(rootPath) ? realpathSync(rootPath) : rootPath, port, publicUrl, configDir };
 }

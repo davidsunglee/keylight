@@ -66,7 +66,7 @@ async function fetchLinear(id: string): Promise<LinearIssue> {
     throw new TaskError(
       `${id} looks like a Linear ticket, and LINEAR_API_KEY is not set. ` +
         `Export a personal API key from Linear (Settings > Security & access), or describe the task in words.\n` +
-        nextLine('fathom start "what to build"'),
+        nextLine('keylight start "what to build"'),
     );
   }
   const query = `query($id: String!) { issue(id: $id) { identifier title description url
@@ -103,7 +103,7 @@ export async function seed(input: string, name: string | undefined): Promise<See
   const id = ticketId(input);
   if (id) return seedFromIssue(await fetchLinear(id), name);
   const description = input.trim();
-  if (!description) throw new TaskError(`usage: fathom start <ticket | "description"> [--workflow NAME] [--profile NAME] [--name TASK]`);
+  if (!description) throw new TaskError(`usage: keylight start <ticket | "description"> [--workflow NAME] [--profile NAME] [--name TASK]`);
   if (name) return { task: name, title: description.split("\n")[0]!.slice(0, 80), body: description };
   const proposed = proposeName(description);
   let task = proposed.task;

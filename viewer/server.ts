@@ -452,7 +452,7 @@ async function handle(req: Request): Promise<Response> {
 
   const path = url.pathname;
   if (path === "/") return html(indexPage());
-  if (path === "/__ping") return Response.json({ app: "fathom-viewer", root, pid: process.pid });
+  if (path === "/__ping") return Response.json({ app: "keylight-viewer", root, pid: process.pid });
 
   if (path === "/assets/theme.css") {
     return new Response(themeCss(themes()), {
@@ -521,7 +521,7 @@ const server = Bun.serve({
     }),
 });
 
-console.log(`fathom viewer: ${localUrl(config)}  (root: ${root})`);
+console.log(`keylight viewer: ${localUrl(config)}  (root: ${root})`);
 if (config.publicUrl) console.log(`public links: ${config.publicUrl}`);
 process.on("SIGTERM", () => {
   server.stop(true);

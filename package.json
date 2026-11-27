@@ -1,15 +1,15 @@
 {
-  "name": "fathom",
+  "name": "keylight",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "description": "A research, design, outline and implement workflow for coding agents, with a local artifact viewer.",
   "bin": {
-    "fathom": "./cli/fathom.ts"
+    "keylight": "./cli/keylight.ts"
   },
   "scripts": {
     "check": "tsc -p .",
-    "serve": "bun cli/fathom.ts serve",
+    "serve": "bun cli/keylight.ts serve",
     "parity": "bun viewer/test/parity.ts",
     "shot": "bun viewer/test/shot.ts"
   },

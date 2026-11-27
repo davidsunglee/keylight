@@ -1,4 +1,4 @@
-// Workflows, steps and profiles: what `fathom run` executes and how each
+// Workflows, steps and profiles: what `keylight run` executes and how each
 // session is launched. Built-in definitions live in workflows.yaml beside this
 // file; <config>/workflows.yaml overrides them.
 
@@ -37,7 +37,7 @@ export interface Workflows {
 
 export class ConfigError extends Error {}
 
-/** The skills shipped with fathom, for prompts that point at one of their files. */
+/** The skills shipped with keylight, for prompts that point at one of their files. */
 export const SKILLS_DIR = join(import.meta.dir, "..", "plugin", "skills");
 
 type Dict = Record<string, unknown>;

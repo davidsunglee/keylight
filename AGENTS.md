@@ -1,4 +1,4 @@
-# fathom
+# keylight
 
 ## Code Documentation
 
@@ -13,7 +13,7 @@ Design principles are in [`CODING_STANDARDS.md`](CODING_STANDARDS.md).
 
 - The viewer and the whole workflow work on a phone. Check every viewer change at phone width.
 - Code decides the order of workflow steps. Models work inside a step only.
-- A definition two skills need lives once, in `plugin/skills/fathom/` or the owning skill, and is reached by relative link.
+- A definition two skills need lives once, in `plugin/skills/keylight/` or the owning skill, and is reached by relative link.
 - The viewer's safety rules in the README are invariants: loopback only, nothing served outside the root, HTML artifacts sandboxed.
 
 ## Skills

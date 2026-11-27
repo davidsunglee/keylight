@@ -18,7 +18,7 @@ You are refining an existing Technical Design Document (TDD) based on the user's
 
 **Show, don't tell.** When discussing architecture, data flow, or code structure, reach for a diagram, type signature, or code-shape sketch. A quick diagram communicates more than paragraphs of prose.
 
-**A diagram in a message goes on the scratch page.** The session runs in a terminal, which draws text only. Follow [`../fathom/SCRATCH.md`](../fathom/SCRATCH.md): code-shape sketches stay in the message; a Mermaid diagram or HTML artifact you are showing as an option goes on the task's scratch page, with its link in the message. Diagrams in the TDD itself stay as they are.
+**A diagram in a message goes on the scratch page.** The session runs in a terminal, which draws text only. Follow [`../keylight/SCRATCH.md`](../keylight/SCRATCH.md): code-shape sketches stay in the message; a Mermaid diagram or HTML artifact you are showing as an option goes on the task's scratch page, with its link in the message. Diagrams in the TDD itself stay as they are.
 
 **Make it read like a document a human designed for other humans.** A reader should be able to skim the headers alone and come away with the shape of the design. Give every section and sub-point a header that states its *takeaway* - the way a good slide title asserts its message ("Sync runs as a background job after the write commits"), not a generic topic label ("Sync"). Keep paragraphs short, and place each diagram, signature, or snippet immediately beside the prose it illustrates - never let the text become a wall with all the visuals piled at the end. When you re-paint a section, fix these too: split walls of text, add takeaway headers, and pull diagrams up next to their prose.
 
@@ -66,7 +66,7 @@ If the user asks to "continue working through questions" or "keep grilling" or s
 ## Steps
 
 1. **Find and read the task directory**:
-   - Read [`../fathom/TASKS.md`](../fathom/TASKS.md), then run `fathom task` to find all related documents in the task folder
+   - Read [`../keylight/TASKS.md`](../keylight/TASKS.md), then run `keylight task` to find all related documents in the task folder
    - Read ALL files in the task directory, including the current TDD and prior artifacts (`ticket.md` or `task.md`, research, PRD if present, etc.)
    - Read [`../create-tdd/lenses-and-gates.md`](../create-tdd/lenses-and-gates.md), then the `CODING_STANDARDS.md` it sends you to
    - **IMPORTANT**: Read entire files, never partially
@@ -79,7 +79,7 @@ If the user asks to "continue working through questions" or "keep grilling" or s
 
 3. **Optional - Dispatch parallel sub-agents for research**:
    - If not clear from existing context, dispatch sub-agents to research different aspects concurrently
-   - Use the right brief for each type of research, dispatched as [`../fathom/SUBAGENTS.md`](../fathom/SUBAGENTS.md) describes:
+   - Use the right brief for each type of research, dispatched as [`../keylight/SUBAGENTS.md`](../keylight/SUBAGENTS.md) describes:
 
    **For deeper investigation:**
    - **codebase-locator** - To find more specific files (e.g., "find all files that handle [specific component]")
@@ -111,7 +111,7 @@ If the user asks to "continue working through questions" or "keep grilling" or s
    - Technical discoveries often reveal product implications
 
 6. **Run the gates, then stop and ask what's next**:
-   - Run the gate of each section you changed: `fathom gate tdd system-design`, then `fathom gate tdd program-design`
+   - Run the gate of each section you changed: `keylight gate tdd system-design`, then `keylight gate tdd program-design`
    - After incorporating the user's feedback and the gates' findings, STOP
    - Present the change you made with your report on each point of the gates' messages, and ask: "What would you like to work on next?"
    - If parts of the design are still unresolved, offer to work through them one at a time
@@ -178,7 +178,7 @@ sequenceDiagram
 Use HTML artifacts when a concept is too complex for Mermaid or plain text, especially when you need to combine code shape, data flow, UI structure, colors, annotations, or side-by-side comparisons.
 
 **Creating HTML artifacts:**
-- Write each one as `diagram-<description>.html` and embed it in the doc, following [`../fathom/HTML-ARTIFACTS.md`](../fathom/HTML-ARTIFACTS.md)
+- Write each one as `diagram-<description>.html` and embed it in the doc, following [`../keylight/HTML-ARTIFACTS.md`](../keylight/HTML-ARTIFACTS.md)
 - Keep each artifact focused on the decision at hand
 - Use realistic labels, not lorem ipsum
 </guidance>

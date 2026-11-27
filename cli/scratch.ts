@@ -1,4 +1,4 @@
-// fathom scratch: the page for visuals a terminal cannot draw.
+// keylight scratch: the page for visuals a terminal cannot draw.
 //
 // A session pipes an entry in; it is added at the top of scratch.md in the
 // task folder, and the viewer page the user keeps open reloads. Without a

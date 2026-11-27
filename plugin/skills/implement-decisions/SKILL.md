@@ -10,7 +10,7 @@ You implement a task whose design was settled in conversation. The **decisions d
 
 ## 1. Read the task
 
-- Read [`../fathom/TASKS.md`](../fathom/TASKS.md), then run `fathom task` to find the task folder.
+- Read [`../keylight/TASKS.md`](../keylight/TASKS.md), then run `keylight task` to find the task folder.
 - Read `task.md` and the decisions document (the highest-numbered `*-decisions-*.md`) fully.
 - Read `CODING_STANDARDS.md` at the repository root when it exists, and the instruction files that cover the paths you will change.
 
@@ -50,7 +50,7 @@ A decision contradicts the code or another decision, or a check still fails afte
 
 ## Final answer
 
-Respond with exactly this, filling in the document's link from `fathom url <path>`:
+Respond with exactly this, filling in the document's link from `keylight url <path>`:
 
 ```markdown
 ### Status

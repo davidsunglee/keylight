@@ -10,7 +10,7 @@ You are iterating on an existing research document based on user feedback.
 
 ## Initial Setup:
 
-When this command is invoked, read [`../fathom/TASKS.md`](../fathom/TASKS.md) and run `fathom task`, then look in the task folder for documents like `*research*.md` (NOT `*research-questions*.md` - `research-questions` documents are EXCLUDED). If you find a research document, read it and proceed. 
+When this command is invoked, read [`../keylight/TASKS.md`](../keylight/TASKS.md) and run `keylight task`, then look in the task folder for documents like `*research*.md` (NOT `*research-questions*.md` - `research-questions` documents are EXCLUDED). If you find a research document, read it and proceed. 
 
 If you see several research documents, ask the user which one to proceed with before reading any of them. 
 
@@ -28,7 +28,7 @@ I'm ready to iterate on researching the codebase. Please provide your research q
    - Understand what research was previously conducted
    - Leave the task folder's other files unread; focus on the research document and the provided feedback.
    - **DO NOT read ticket files** - research must stay objective about the current codebase.
-   - **If a document path was not provided:** find the research document in the `fathom task` listing.
+   - **If a document path was not provided:** find the research document in the `keylight task` listing.
 
 
 2. **Process the feedback**:
@@ -38,7 +38,7 @@ I'm ready to iterate on researching the codebase. Please provide your research q
 
 3. **Conduct additional research** (if needed):
    - Spawn parallel sub-agent tasks for comprehensive research
-   - Use only the research sub-agents listed below, dispatched as [`../fathom/SUBAGENTS.md`](../fathom/SUBAGENTS.md) describes.
+   - Use only the research sub-agents listed below, dispatched as [`../keylight/SUBAGENTS.md`](../keylight/SUBAGENTS.md) describes.
 
    **For codebase research:**
    - **codebase-locator**: Find WHERE files and components live

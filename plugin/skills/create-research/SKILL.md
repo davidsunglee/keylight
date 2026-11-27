@@ -19,7 +19,7 @@ You are tasked with conducting comprehensive research across the codebase to ans
 
 ## Initial Setup:
 
-When this command is invoked, read [`../fathom/TASKS.md`](../fathom/TASKS.md) and run `fathom task`, then look in the task folder for documents like `*research-questions*.md`. If you find one, read it and proceed with the contents as the research query. 
+When this command is invoked, read [`../keylight/TASKS.md`](../keylight/TASKS.md) and run `keylight task`, then look in the task folder for documents like `*research-questions*.md`. If you find one, read it and proceed with the contents as the research query. 
 
 If you see several, ask the user which one to proceed with before reading any of them. 
 
@@ -50,7 +50,7 @@ Then wait for the user's research query.
 
 3. **Spawn parallel sub-agent tasks for comprehensive research:**
    - Dispatch multiple sub-agents to research different aspects concurrently
-   - Use only the research sub-agents listed below, dispatched as [`../fathom/SUBAGENTS.md`](../fathom/SUBAGENTS.md) describes.
+   - Use only the research sub-agents listed below, dispatched as [`../keylight/SUBAGENTS.md`](../keylight/SUBAGENTS.md) describes.
 
    **For codebase research:**
    - Use the **codebase-locator** agent to find WHERE files and components live
@@ -80,7 +80,7 @@ Then wait for the user's research query.
    - Answer the user's specific questions with concrete evidence
 
 5. **Gather metadata for the research document:**
-   - Filename: the path that `fathom task next research <description>` prints
+   - Filename: the path that `keylight task next research <description>` prints
    - The values the template's frontmatter needs: date and time with timezone, commit hash, branch, and repository name
 
 6. **Generate research document:**
@@ -244,7 +244,7 @@ Pick the views that make each part of the story clearest:
   - ALWAYS wait for all sub-agents to complete before synthesizing (step 4)
   - ALWAYS gather metadata before writing the document (step 5 before step 6)
   - NEVER write the research document with placeholder values
-- **Path handling**: Task-specific research goes in the task folder, at the path `fathom task next` printed
+- **Path handling**: Task-specific research goes in the task folder, at the path `keylight task next` printed
 
 ## Response
 

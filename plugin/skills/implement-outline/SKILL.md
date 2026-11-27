@@ -8,12 +8,12 @@ disable-model-invocation: true
 
 You are the orchestrator for implementing a structure outline. You work through each phase systematically, dispatching one `outline-implementer` sub-agent per phase and reading the outline and its companion documents.
 
-**CRITICAL**: This skill IS the implementation orchestrator. You dispatch the `outline-implementer` sub-agent yourself, as [`../fathom/SUBAGENTS.md`](../fathom/SUBAGENTS.md) describes.
+**CRITICAL**: This skill IS the implementation orchestrator. You dispatch the `outline-implementer` sub-agent yourself, as [`../keylight/SUBAGENTS.md`](../keylight/SUBAGENTS.md) describes.
 
 ## Getting Started
 
 When invoked:
-1. Read [`../fathom/TASKS.md`](../fathom/TASKS.md), then run `fathom task` to find the task folder and list its documents:
+1. Read [`../keylight/TASKS.md`](../keylight/TASKS.md), then run `keylight task` to find the task folder and list its documents:
    - note the structure outline: the highest-numbered `*-structure-outline-*.md`
    - note the companion documents: research (`*-research-*.md`), TDD (`*-tdd-*.md`), PRD (`*-prd-*.md`)
 2. Read the structure outline fully to understand the phases
@@ -36,7 +36,7 @@ Note the current commit (`git rev-parse HEAD`) as the phase's starting point, th
 
 Example prompt:
 ```
-Read /absolute/path/to/fathom/agents/outline-implementer.md and follow it.
+Read /absolute/path/to/keylight/agents/outline-implementer.md and follow it.
 
 Implement Phase [N] from the structure outline at .artifacts/tasks/<task>/NN-structure-outline-<description>.md
 
@@ -120,7 +120,7 @@ Unless expressly asked, don't commit or proceed to a next phase until the human 
 
 Workflow checklist:
 
-- [ ] run `fathom task` and discover the documents
+- [ ] run `keylight task` and discover the documents
 - [ ] read the structure outline to understand phases
 - [ ] note the starting commit, then dispatch an `outline-implementer` sub-agent for Phase 1
 - [ ] report a summary and ask the human to perform manual verification
@@ -134,7 +134,7 @@ Workflow checklist:
 When ALL phases are complete and verified:
 
 1. Commit the final changes
-2. Respond with exactly this, filling in the outline's link from `fathom url <path>`. Do not include a summary or other information.
+2. Respond with exactly this, filling in the outline's link from `keylight url <path>`. Do not include a summary or other information.
 
 ```markdown
 ### Status
@@ -144,7 +144,7 @@ When ALL phases are complete and verified:
 
 ### Next Steps
 
-To create a PR, start a new session and run the `fathom:describe-pr` skill.
+To create a PR, start a new session and run the `kl:describe-pr` skill.
 
 ---
 

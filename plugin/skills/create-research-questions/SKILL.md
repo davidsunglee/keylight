@@ -18,7 +18,7 @@ These questions will be used by another agent to research the codebase.
 
 1. **Read all @-mentioned files immediately and FULLY**:
 
-    - Read [`../fathom/TASKS.md`](../fathom/TASKS.md), then run `fathom task` to find the task folder
+    - Read [`../keylight/TASKS.md`](../keylight/TASKS.md), then run `keylight task` to find the task folder
     - Ticket files (the task folder's `ticket.md` or `task.md`)
     - collateral files if explicitly mentioned
     - **DO NOT** read other artifacts unless requested. 
@@ -26,7 +26,7 @@ These questions will be used by another agent to research the codebase.
     - **Capture key context pointers**: As you read, note any concrete pointers the user or ticket provides — links (URLs, docs, Linear/GitHub issues), repositories, libraries, dependencies, packages, filepaths, or directories. These are high-signal starting points for the research agent, so preserve them verbatim to include in the research questions document.
 
 2. **Perform lightweight research to contextualize the ticket and the user's request**
-    Use only the research sub-agents listed below, dispatched as [`../fathom/SUBAGENTS.md`](../fathom/SUBAGENTS.md) describes.
+    Use only the research sub-agents listed below, dispatched as [`../keylight/SUBAGENTS.md`](../keylight/SUBAGENTS.md) describes.
 
     - **codebase-locator**: Find all files related to the task/feature
       - Finds relevant source files, configs, and tests
@@ -78,7 +78,7 @@ Follow this format, using an appropriate number of questions for the task (less 
 
 Populate the **Key Context Pointers** section with the links, repositories, libraries, dependencies, and filepaths you captured from the ticket in step 1. Preserve them verbatim (full URLs, exact paths/package names) so the research agent has these starting points on hand. Omit the section only if the ticket truly provides none.
 
-2. **Write the research questions** to the path that `fathom task next research-questions <description>` prints.
+2. **Write the research questions** to the path that `keylight task next research-questions <description>` prints.
 
 3. **Respond following [`final-answer.md`](final-answer.md) EXACTLY.** Do not include a summary or other information.
 

@@ -1,15 +1,15 @@
-# fathom writer for the Theme utility (~/.config/theme).
+# keylight writer for the Theme utility (~/.config/theme).
 #
-# Links every slug's Ghostty theme file into fathom's config directory and
-# records which pair fathom follows when no theme is picked in the viewer.
-# fathom derives all of its colors from those files, so no per-theme map is
+# Links every slug's Ghostty theme file into keylight's config directory and
+# records which pair keylight follows when no theme is picked in the viewer.
+# keylight derives all of its colors from those files, so no per-theme map is
 # needed here.
 #
 # Install: add this function to ~/.config/theme/apply.zsh, and call
-# `_theme_write_fathom` from the writer list in _theme_propagate.
+# `_theme_write_keylight` from the writer list in _theme_propagate.
 
-_theme_write_fathom() {
-  local dir="${FATHOM_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/fathom}"
+_theme_write_keylight() {
+  local dir="${KEYLIGHT_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/keylight}"
   local slug file
   mkdir -p "$dir/themes" || return 1
   for slug in $THEME_SLUGS; do

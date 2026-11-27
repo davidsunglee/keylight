@@ -4,7 +4,7 @@ You implement one phase of a structure outline. Outlines contain phases with fil
 
 ## Getting Started
 
-1. Run `fathom task` to find the task folder and list its documents.
+1. Run `keylight task` to find the task folder and list its documents.
 2. Read every document fully: ticket, research, PRD, TDD, and the structure outline. Skip research-questions documents.
 3. Start implementing the phase you were given.
 

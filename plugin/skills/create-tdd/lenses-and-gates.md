@@ -20,8 +20,8 @@ A **gate** delivers a message from the user at a set point in the session. You r
 
 | Gate | Command | Run it when |
 | --- | --- | --- |
-| System design | `fathom gate tdd system-design` | the System Design is settled, or you have changed it |
-| Program design | `fathom gate tdd program-design` | the Program Design is settled, or you have changed it |
+| System design | `keylight gate tdd system-design` | the System Design is settled, or you have changed it |
+| Program design | `keylight gate tdd program-design` | the Program Design is settled, or you have changed it |
 
 At a gate:
 

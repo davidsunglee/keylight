@@ -1,10 +1,10 @@
 # Task folders
 
-Every workflow skill reads and writes one **task folder**: the documents for one piece of work, shared by every session and worktree working on it. The `fathom` command is the source of truth for where the folder is and what it holds.
+Every workflow skill reads and writes one **task folder**: the documents for one piece of work, shared by every session and worktree working on it. The `keylight` command is the source of truth for where the folder is and what it holds.
 
 ## Finding the folder
 
-`fathom task` prints the task linked to this worktree:
+`keylight task` prints the task linked to this worktree:
 
 ```text
 task   cor-310-page-offset
@@ -18,20 +18,20 @@ files
 
 `dir` is a symlink into the artifact store, which lives outside the repository. Read and write through `dir` as an ordinary directory. Git ignores it, so task documents stay out of every commit.
 
-When no task is linked, `fathom task` says so:
+When no task is linked, `keylight task` says so:
 
-- `fathom task list` shows the tasks already stored for this repository.
-- `fathom task new <task>` links one of those, or creates it.
+- `keylight task list` shows the tasks already stored for this repository.
+- `keylight task new <task>` links one of those, or creates it.
 
 Name a task `<ticket>-<description>` in kebab case, such as `cor-310-page-offset`, or the description alone when there is no ticket. When the request leaves the task open, ask the user which one this is before creating anything.
 
-A checkout shared by several tasks has several linked, and `fathom task` lists them. Work on the one the user named, passing `--task <task>` to `fathom task` and `fathom task next`; when they named none, ask.
+A checkout shared by several tasks has several linked, and `keylight task` lists them. Work on the one the user named, passing `--task <task>` to `keylight task` and `keylight task next`; when they named none, ask.
 
 ## Documents
 
 Staged documents are numbered in the order they were written: `NN-<kind>-<description>.md`, where `<description>` is a 2-4 word kebab-case slug.
 
-`fathom task next <kind> <description>` prints the path for a new one, for example `fathom task next tdd retry-policy`.
+`keylight task next <kind> <description>` prints the path for a new one, for example `keylight task next tdd retry-policy`.
 
 | Kind | Document |
 | --- | --- |
@@ -52,7 +52,7 @@ The folder also holds un-numbered files: `task.md` and any ticket text (the ask)
 
 ## Writing documents
 
-Documents are read in the fathom viewer, which renders Markdown, Mermaid, highlighted code and diffs.
+Documents are read in the keylight viewer, which renders Markdown, Mermaid, highlighted code and diffs.
 
 - **Nested fences.** When a code block shows Markdown that has its own fence, give the outer fence four backticks so the inner one cannot close it.
 - **Mermaid that parses.** Quote any node or edge label containing punctuation (`A["conflict: a | b"]`), and keep `;` out of sequence-diagram messages. A diagram that fails to parse shows as an error.
@@ -60,7 +60,7 @@ Documents are read in the fathom viewer, which renders Markdown, Mermaid, highli
 
 ## Showing a document to the user
 
-`fathom url <path>` prints a link that opens the document in the viewer, starting the viewer if needed. The page updates as the file changes.
+`keylight url <path>` prints a link that opens the document in the viewer, starting the viewer if needed. The page updates as the file changes.
 
 Whenever you hand the user a document to read, give them that link.
 

@@ -5,7 +5,7 @@ description: Help the user understand the current topic visually with concise di
 
 Help the user understand the current topic of conversation visually. Skip the preamble and keep prose brief. Pick the smallest view that makes the key point clear.
 
-**Where a view goes.** When you are answering in the conversation, follow [`../fathom/SCRATCH.md`](../fathom/SCRATCH.md): text shapes go in the message, Mermaid diagrams and HTML artifacts go on the task's scratch page. When another skill sent you here for the conventions of a document it is writing, every view goes in that document.
+**Where a view goes.** When you are answering in the conversation, follow [`../keylight/SCRATCH.md`](../keylight/SCRATCH.md): text shapes go in the message, Mermaid diagrams and HTML artifacts go on the task's scratch page. When another skill sent you here for the conventions of a document it is writing, every view goes in that document.
 
 - Show logic or an algorithm as pseudocode:
 
@@ -116,6 +116,6 @@ function expandSkill(command: string): string {
 }
 ```
 
-- For a visual UI, layout, state comparison, or concept too dense for Mermaid, create one focused HTML artifact named `show-me-<description>.html`, following [`../fathom/HTML-ARTIFACTS.md`](../fathom/HTML-ARTIFACTS.md). Use real labels and data, and support desktop and mobile.
+- For a visual UI, layout, state comparison, or concept too dense for Mermaid, create one focused HTML artifact named `show-me-<description>.html`, following [`../keylight/HTML-ARTIFACTS.md`](../keylight/HTML-ARTIFACTS.md). Use real labels and data, and support desktop and mobile.
 
 - Place each visual next to the short text it supports. Keep only the calls, files, props, states, and boundaries needed to answer the user's current question.

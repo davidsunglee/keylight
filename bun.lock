@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "fathom-viewer",
+      "name": "keylight-viewer",
       "dependencies": {
         "highlight.js": "11",
         "markdown-it": "14",

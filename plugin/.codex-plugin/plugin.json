@@ -1,5 +1,5 @@
 {
-  "name": "fathom",
+  "name": "kl",
   "version": "0.1.0",
   "description": "Research, design, outline and implement workflow skills built around rich design artifacts on local disk.",
   "author": {
@@ -8,7 +8,7 @@
   "license": "Apache-2.0",
   "skills": "./skills/",
   "interface": {
-    "displayName": "fathom",
+    "displayName": "keylight",
     "shortDescription": "Research, design, outline, implement"
   }
 }

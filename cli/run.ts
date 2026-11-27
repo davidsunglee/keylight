@@ -1,11 +1,11 @@
-// fathom run: take a task through its workflow, one fresh session per step.
+// keylight run: take a task through its workflow, one fresh session per step.
 //
 // The runner is a foreground loop. It starts each step's session as a child
 // process, waits for it to end, checks what the step was meant to leave
 // behind, and starts the next. Headless steps chain on their own; an
 // interactive step hands back when you quit its session.
 //
-// What cannot be read from the task's documents is kept in <task>/.fathom.json:
+// What cannot be read from the task's documents is kept in <task>/.keylight.json:
 // the workflow, the profile, where the work happens, and which steps are done.
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -48,7 +48,7 @@ export interface RunOptions {
   fresh?: boolean;
 }
 
-const STATE_FILE = ".fathom.json";
+const STATE_FILE = ".keylight.json";
 const dim = (text: string) => (process.stdout.isTTY ? `\x1b[2m${text}\x1b[0m` : text);
 const bold = (text: string) => (process.stdout.isTTY ? `\x1b[1m${text}\x1b[0m` : text);
 
@@ -117,10 +117,10 @@ function firstFile(paths: string[]): string | null {
 
 /**
  * A prompt kept in a file: the repository's copy wins over the personal one.
- *   <repo>/.fathom/prompts/<name>.md, then <config>/prompts/<name>.md
+ *   <repo>/.keylight/prompts/<name>.md, then <config>/prompts/<name>.md
  */
 function promptFile(name: string, cwd: string, config: Config): string | null {
-  return firstFile([join(cwd, ".fathom", "prompts", `${name}.md`), join(config.configDir, "prompts", `${name}.md`)]);
+  return firstFile([join(cwd, ".keylight", "prompts", `${name}.md`), join(config.configDir, "prompts", `${name}.md`)]);
 }
 
 /**
@@ -128,8 +128,8 @@ function promptFile(name: string, cwd: string, config: Config): string | null {
  * design. Falls back to the copy shipped with the step's skill.
  */
 export function gatePrompt(stepName: string, gate: string, cwd: string, config: Config, workflows: Workflows): string {
-  // A fathom skill is named `fathom:<folder>`; other plugins' skills ship no gate text here.
-  const folder = workflows.steps[stepName]?.skill?.replace(/^fathom:/, "");
+  // A keylight skill is named `kl:<folder>`; other plugins' skills ship no gate text here.
+  const folder = workflows.steps[stepName]?.skill?.replace(/^kl:/, "");
   const text =
     promptFile(`${stepName}.${gate}`, cwd, config) ?? (folder ? firstFile([join(SKILLS_DIR, folder, `gate-${gate}.md`)]) : null);
   if (text === null) throw new TaskError(`no prompt for gate "${gate}" of step "${stepName}"`);
@@ -257,10 +257,10 @@ function unmet(step: Step, ctx: Context, cwd: string): string | null {
 }
 
 function stepEnv(ctx: Context, name?: string): Record<string, string> {
-  const env: Record<string, string> = { ...(process.env as Record<string, string>), FATHOM_TASK: ctx.task, FATHOM_TASK_DIR: ctx.store };
-  if (name) env.FATHOM_STEP = name;
-  if (ctx.state.worktree) env.FATHOM_WORKTREE = ctx.state.worktree;
-  if (ctx.state.base) env.FATHOM_BASE = ctx.state.base;
+  const env: Record<string, string> = { ...(process.env as Record<string, string>), KEYLIGHT_TASK: ctx.task, KEYLIGHT_TASK_DIR: ctx.store };
+  if (name) env.KEYLIGHT_STEP = name;
+  if (ctx.state.worktree) env.KEYLIGHT_WORKTREE = ctx.state.worktree;
+  if (ctx.state.base) env.KEYLIGHT_BASE = ctx.state.base;
   return env;
 }
 
@@ -288,7 +288,7 @@ function subagentEnv(launch: Launch): Record<string, string> {
 }
 
 function logFile(ctx: Context, name: string): string {
-  const dir = join(homedir(), ".fathom", "logs", ctx.repo.name, ctx.task);
+  const dir = join(homedir(), ".keylight", "logs", ctx.repo.name, ctx.task);
   mkdirSync(dir, { recursive: true });
   return join(dir, `${name}-${new Date().toISOString().replace(/[:.]/g, "-")}.jsonl`);
 }
@@ -417,7 +417,7 @@ export async function runWorkflow(config: Config, workflows: Workflows, options:
       if (latest.steps[name]) ctx.workflows = latest;
     } catch (err) {
       if (!(err instanceof ConfigError)) throw err;
-      console.error(`fathom: keeping the settings already loaded: ${err.message}`);
+      console.error(`keylight: keeping the settings already loaded: ${err.message}`);
     }
     const next = index < last ? steps[index + 1] : undefined;
     const first = name === steps[start];
@@ -425,15 +425,15 @@ export async function runWorkflow(config: Config, workflows: Workflows, options:
     const outcome = await runStep(name, ctx, options.dryRun ?? false, next, entry);
     if (typeof outcome === "object") {
       const why = /[.!?]$/.test(outcome.problem) ? outcome.problem : `${outcome.problem}.`;
-      console.error([`\nfathom: ${name} is not finished: ${why}`, ...(outcome.details ?? []), nextLine("fathom run")].join("\n"));
+      console.error([`\nkeylight: ${name} is not finished: ${why}`, ...(outcome.details ?? []), nextLine("keylight run")].join("\n"));
       return 1;
     }
     if (outcome === "open") {
-      console.log(`${name} is left open.\n${nextLine("fathom run")}`);
+      console.log(`${name} is left open.\n${nextLine("keylight run")}`);
       return 0;
     }
     if (outcome === "done-stop") {
-      console.log(`Stopped before ${next}.\n${nextLine("fathom run")}`);
+      console.log(`Stopped before ${next}.\n${nextLine("keylight run")}`);
       return 0;
     }
   }
@@ -448,7 +448,7 @@ export function printStatus(config: Config, workflows: Workflows, named: string 
   const state = readState(store);
   console.log(`task      ${task}`);
   if (!state) {
-    console.log(`workflow  (not started)\n${nextLine("fathom run [--workflow NAME]")}`);
+    console.log(`workflow  (not started)\n${nextLine("keylight run [--workflow NAME]")}`);
     return 0;
   }
   console.log(`workflow  ${state.workflow}  (profile ${state.profile})`);

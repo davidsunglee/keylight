@@ -20,21 +20,21 @@ You run the PRD as a guided conversation. You settle the **foundation** - the pr
 
 **The doc is always a cohesive description of what's known - never a log.** At any point, the PRD should read like a spec someone wrote on purpose: high-level, coherent, and current - not a list of answers, and not a changelog of decisions. Treat each answer as a reason to re-paint: restructure, reorder, and rebuild the section so it stays a clean, unified description of everything decided so far. **Rewriting entire sections as you go is expected, not exceptional.**
 
-**Show, don't tell.** When discussing anything visual - UI flows, layouts, interactions, states - create an HTML mockup and show it to the user on the task's scratch page, as [`../fathom/SCRATCH.md`](../fathom/SCRATCH.md) describes: the session runs in a terminal, which cannot display it. A quick sketch communicates more than paragraphs of prose. Keep mockups up to date as decisions evolve.
+**Show, don't tell.** When discussing anything visual - UI flows, layouts, interactions, states - create an HTML mockup and show it to the user on the task's scratch page, as [`../keylight/SCRATCH.md`](../keylight/SCRATCH.md) describes: the session runs in a terminal, which cannot display it. A quick sketch communicates more than paragraphs of prose. Keep mockups up to date as decisions evolve.
 
 **Make it read like a document a human designed for other humans.** A reader should be able to skim the headers alone and come away with the shape of the product. Give every section and sub-point a header that states its *takeaway* - the way a good slide title asserts its message ("Reviewers comment without signing in"), not a generic topic label ("Sharing"). Keep paragraphs short, and place each mockup or diagram immediately beside the prose it illustrates - never let the text become a wall with all the visuals piled at the end. Lead with the point, then support it.
 
 **Stay in product space.** Only ask product questions - user experience, functionality, and behavior. If you find yourself reaching for database schemas, storage locations, or implementation architecture, note it in a "Deferred to TDD" section and move on.
 
-**Get more context when you need it.** When a decision depends on how the product or codebase actually works, dispatch sub-agents before presenting options: `codebase-locator`, `codebase-analyzer`, `codebase-pattern-finder`, or `web-search-researcher`, as [`../fathom/SUBAGENTS.md`](../fathom/SUBAGENTS.md) describes. Fold any new findings back into the research artifact.
+**Get more context when you need it.** When a decision depends on how the product or codebase actually works, dispatch sub-agents before presenting options: `codebase-locator`, `codebase-analyzer`, `codebase-pattern-finder`, or `web-search-researcher`, as [`../keylight/SUBAGENTS.md`](../keylight/SUBAGENTS.md) describes. Fold any new findings back into the research artifact.
 
 ---
 
 <step index="1" name="understand-the-context">
 
 <instructions>
-- Read [`../fathom/TASKS.md`](../fathom/TASKS.md): it covers finding the task folder, naming and formatting documents, and linking them for the user.
-- Run `fathom task` to find the task folder and list its files.
+- Read [`../keylight/TASKS.md`](../keylight/TASKS.md): it covers finding the task folder, naming and formatting documents, and linking them for the user.
+- Run `keylight task` to find the task folder and list its files.
 - Read every relevant file in the task folder **fully**, excluding research-questions docs.
 - Read the PRD template: [`prd-template.md`](prd-template.md).
 </instructions>
@@ -61,14 +61,14 @@ If the work touches UI/UX, your mockups should match the **user's product** - it
 <step index="2" name="write-the-skeleton">
 
 <instructions>
-Write the doc to the path that `fathom task next prd <description>` prints.
+Write the doc to the path that `keylight task next prd <description>` prints.
 
 **Keep the skeleton as minimal as possible. No preamble, no setup, no summaries.** The faster you reach the first question, the more the user stays engaged in building the PRD. Write only:
 - Frontmatter with `type: design-prd`, plus the top-level title
 - A **Problem to Solve** section with your first-draft problem statement
 - Empty **What does business success look like, and how can we measure it?**, **Proposed Solution**, and **Solution Details** headers - built out through the interview
 
-Then respond immediately by opening the foundation with the **first question** - at most one short orienting line carrying the document's link from `fathom url <path>`, then the question. The linked page updates as you re-work the doc, so the user can keep it open beside the conversation. Quote the actual "Problem to Solve" content you drafted so the user reacts to the exact wording, not a summary. For example:
+Then respond immediately by opening the foundation with the **first question** - at most one short orienting line carrying the document's link from `keylight url <path>`, then the question. The linked page updates as you re-work the doc, so the user can keep it open beside the conversation. Quote the actual "Problem to Solve" content you drafted so the user reacts to the exact wording, not a summary. For example:
 
 > I've started the PRD: http://localhost:4747/view/... First question: does this **Problem to Solve** sound right?
 >
@@ -110,7 +110,7 @@ When an answer reshapes the work, touch every affected section in the same pass:
 
 Mockups are how you communicate visually - use them liberally when discussing UI.
 
-- Write each mockup as `mockup-<description>.html`, following [`../fathom/HTML-ARTIFACTS.md`](../fathom/HTML-ARTIFACTS.md) for where it goes, how to embed it in the PRD, and how to show it in conversation
+- Write each mockup as `mockup-<description>.html`, following [`../keylight/HTML-ARTIFACTS.md`](../keylight/HTML-ARTIFACTS.md) for where it goes, how to embed it in the PRD, and how to show it in conversation
 - Follow the **user's product** design system (colors, fonts, components) found in Step 1, rather than the artifact template; use realistic labels, not lorem ipsum
 - Keep each mockup focused on the decision at hand
 

@@ -1,11 +1,11 @@
 {
-  "name": "fathom",
+  "name": "keylight",
   "interface": {
-    "displayName": "fathom"
+    "displayName": "keylight"
   },
   "plugins": [
     {
-      "name": "fathom",
+      "name": "kl",
       "source": {
         "source": "local",
         "path": "./plugin"

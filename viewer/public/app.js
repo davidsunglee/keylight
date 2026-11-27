@@ -310,10 +310,10 @@ function keepFolds(container, key, sectionOf) {
 }
 
 // The document and the outline fold separately: tidying the outline should not move the page.
-const foldDocument = keepFolds(doc, "fathom-folded", (details) =>
+const foldDocument = keepFolds(doc, "keylight-folded", (details) =>
   details.matches("details.section") ? details.querySelector(":scope > summary > [id]")?.id : undefined,
 );
-const foldOutline = keepFolds(document.getElementById("outline"), "fathom-outline-folded", (details) =>
+const foldOutline = keepFolds(document.getElementById("outline"), "keylight-outline-folded", (details) =>
   details.querySelector(":scope > summary > a")?.getAttribute("href").slice(1),
 );
 
@@ -356,7 +356,7 @@ function setDrawer(open) {
 function setCollapsed(collapsed) {
   if (collapsed) root.dataset.sidebar = "collapsed";
   else delete root.dataset.sidebar;
-  remember("fathom-sidebar", collapsed ? "collapsed" : null);
+  remember("keylight-sidebar", collapsed ? "collapsed" : null);
   markSidebar();
 }
 
@@ -386,7 +386,7 @@ const SIDEBAR_WIDTHS = { min: 180, max: 640, step: 16 };
 function setSidebarWidth(px) {
   const width = Math.round(Math.min(SIDEBAR_WIDTHS.max, Math.max(SIDEBAR_WIDTHS.min, px)));
   root.style.setProperty("--sidebar-width", `${width}px`);
-  remember("fathom-sidebar-width", String(width));
+  remember("keylight-sidebar-width", String(width));
 }
 
 resizer?.addEventListener("pointerdown", (event) => {
@@ -401,7 +401,7 @@ resizer?.addEventListener("pointermove", (event) => {
 resizer?.addEventListener("lostpointercapture", () => document.body.classList.remove("resizing"));
 resizer?.addEventListener("dblclick", () => {
   root.style.removeProperty("--sidebar-width");
-  remember("fathom-sidebar-width", null);
+  remember("keylight-sidebar-width", null);
 });
 resizer?.addEventListener("keydown", (event) => {
   const direction = { ArrowLeft: -1, ArrowRight: 1 }[event.key];
@@ -426,7 +426,7 @@ function markTheme() {
 function pickTheme(name) {
   if (name) root.dataset.theme = name;
   else delete root.dataset.theme;
-  remember("fathom-theme", name || null);
+  remember("keylight-theme", name || null);
   markTheme();
   recolorDiagrams();
 }

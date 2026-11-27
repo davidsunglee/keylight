@@ -20,7 +20,7 @@ Create or update the pull request for the current task with a concise descriptio
    - Ask the user to select a PR only when the current branch has no relevant work and there is no safe current-branch PR to create.
 
 3. Gather only the context needed to explain the change:
-   - Read [`../fathom/TASKS.md`](../fathom/TASKS.md), then run `fathom task` to find the task folder. Read the ticket and any relevant task documents.
+   - Read [`../keylight/TASKS.md`](../keylight/TASKS.md), then run `keylight task` to find the task folder. Read the ticket and any relevant task documents.
    - Read the complete PR diff and enough surrounding code to understand behavior and ownership.
    - Use `gh pr view` to collect PR metadata and changed files.
    - Read [`../show-me/SKILL.md`](../show-me/SKILL.md) for the visual-outline conventions used in the PR body.
@@ -43,7 +43,7 @@ Create or update the pull request for the current task with a concise descriptio
    - Update the PR with `gh pr edit {number} --body-file {output-path}`.
    - Confirm the update succeeded.
 
-6. Report completion with exactly this, filling in the saved description's link from `fathom url <path>`:
+6. Report completion with exactly this, filling in the saved description's link from `keylight url <path>`:
 
    ```markdown
    ### Status

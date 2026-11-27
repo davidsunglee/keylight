@@ -3,7 +3,7 @@
 //   Is tdd finished? [Enter] yes, start structure-outline · [s] yes, stop here · [n] not yet:
 //
 //   tdd is left open.
-//   Next:  fathom run
+//   Next:  keylight run
 
 type Choice = [key: string, meaning: string];
 

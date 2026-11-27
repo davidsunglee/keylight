@@ -15,7 +15,7 @@ A **brief** in [`agents/`](agents/) defines each sub-agent role: what it is for,
 Spawn a general-purpose sub-agent. Its prompt is the brief's absolute path with the instruction to read and follow it, then the task, then any paths it needs:
 
 ```text
-Read /absolute/path/to/fathom/agents/codebase-locator.md and follow it.
+Read /absolute/path/to/keylight/agents/codebase-locator.md and follow it.
 
 Task: find where retry policy is configured and where it is consumed.
 ```

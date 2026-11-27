@@ -10,7 +10,7 @@ You are iterating on an existing structure outline document based on user feedba
 
 ## Input
 
-- Read [`../fathom/TASKS.md`](../fathom/TASKS.md), then run `fathom task` to find the task folder and the structure outline in it.
+- Read [`../keylight/TASKS.md`](../keylight/TASKS.md), then run `keylight task` to find the task folder and the structure outline in it.
 - Optionally, a ticket file path containing comments with feedback
 
 ## Initial Check
@@ -44,7 +44,7 @@ Then wait for the user's feedback before proceeding.
    - Read the specific files/directories they mention
    - Only proceed once you've verified the facts yourself
 
-4. **Dispatch sub-agents for follow-up research** (if needed), as [`../fathom/SUBAGENTS.md`](../fathom/SUBAGENTS.md) describes:
+4. **Dispatch sub-agents for follow-up research** (if needed), as [`../keylight/SUBAGENTS.md`](../keylight/SUBAGENTS.md) describes:
 
    - **codebase-locator**: Find additional files if needed
    - **codebase-analyzer**: Deep-dive on specific implementations
@@ -88,7 +88,7 @@ These are intended to be **illustrative**. Not all work lends itself to this typ
    - Update validation approaches
    - Remove answered questions from "Open Questions"
 
-7. **Run the gate** when you changed the document: `fathom gate structure-outline review`. What it prints is a message from the user, delivered now instead of typed. Carry it out in full, exactly as if they had sent it, and fix what it turns up in the outline.
+7. **Run the gate** when you changed the document: `keylight gate structure-outline review`. What it prints is a message from the user, delivered now instead of typed. Carry it out in full, exactly as if they had sent it, and fix what it turns up in the outline.
 
 8. **Update the user**
    - Respond with your report on each point of the gate's message, then [`../create-structure-outline/final-answer.md`](../create-structure-outline/final-answer.md) exactly. Do not add a summary or other information.

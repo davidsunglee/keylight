@@ -22,7 +22,7 @@ const VALUE_FLAGS = new Set([
 const positional = argv.slice(1).filter((arg, i, rest) => !arg.startsWith("--") && !VALUE_FLAGS.has(rest[i - 1] ?? ""));
 
 function fail(message: string): never {
-  console.error(`fathom: ${message}`);
+  console.error(`keylight: ${message}`);
   process.exit(1);
 }
 
@@ -36,7 +36,7 @@ async function ping(config: Config): Promise<Ping | null> {
   try {
     const res = await fetch(`http://127.0.0.1:${config.port}/__ping`, { signal: AbortSignal.timeout(500) });
     const body = (await res.json()) as Ping;
-    return body.app === "fathom-viewer" ? body : null;
+    return body.app === "keylight-viewer" ? body : null;
   } catch {
     return null;
   }
@@ -53,11 +53,11 @@ async function ensureServer(config: Config): Promise<ViewerProblem | null> {
   const running = await ping(config);
   if (running) {
     if (running.root !== config.root) {
-      return { why: `port ${config.port} already serves ${running.root}. Pass --port to use another port, or stop that viewer.`, fix: "fathom stop" };
+      return { why: `port ${config.port} already serves ${running.root}. Pass --port to use another port, or stop that viewer.`, fix: "keylight stop" };
     }
     return null;
   }
-  const log = join(tmpdir(), `fathom-viewer-${config.port}.log`);
+  const log = join(tmpdir(), `keylight-viewer-${config.port}.log`);
   const out = openSync(log, "a");
   const args = [join(import.meta.dir, "..", "viewer", "server.ts"), "--root", config.root, "--port", String(config.port)];
   args.push("--config", config.configDir);
@@ -92,14 +92,14 @@ async function main() {
         "",
         TASK_USAGE,
         "",
-        "fathom view [path]   open an artifact (or the task index) in the viewer",
-        "fathom url  [path]   print the link without opening a browser",
-        "fathom serve         run the viewer in the foreground",
-        "fathom stop          stop a background viewer",
+        "keylight view [path]   open an artifact (or the task index) in the viewer",
+        "keylight url  [path]   print the link without opening a browser",
+        "keylight serve         run the viewer in the foreground",
+        "keylight stop          stop a background viewer",
         "",
         "Options: --root DIR  --port N  --public-url URL  --config DIR  --no-open",
-        "Environment: FATHOM_ROOT (default ~/Artifacts), FATHOM_PORT (default 4747), FATHOM_PUBLIC_URL,",
-        "             FATHOM_CONFIG (default ~/.config/fathom; holds themes)",
+        "Environment: KEYLIGHT_ROOT (default ~/Artifacts), KEYLIGHT_PORT (default 4747), KEYLIGHT_PUBLIC_URL,",
+        "             KEYLIGHT_CONFIG (default ~/.config/keylight; holds themes)",
       ].join("\n"),
     );
     return;
@@ -107,7 +107,7 @@ async function main() {
 
   const config = loadConfig(argv);
 
-  const named = flag(argv, "task") ?? (process.env.FATHOM_TASK || undefined);
+  const named = flag(argv, "task") ?? (process.env.KEYLIGHT_TASK || undefined);
 
   if (command === "task") process.exit(taskCommand(positional, config, named));
 
@@ -148,7 +148,7 @@ async function main() {
 
   if (command === "view" || command === "url") {
     if (!existsSync(config.root)) {
-      if (flagGiven("root") || process.env.FATHOM_ROOT) fail(`artifact root does not exist: ${config.root}`);
+      if (flagGiven("root") || process.env.KEYLIGHT_ROOT) fail(`artifact root does not exist: ${config.root}`);
       mkdirSync(config.root, { recursive: true });
     }
     const link = linkFor(config, positional[0]);
@@ -159,8 +159,8 @@ async function main() {
     console.log(link);
     // Only a person at a terminal is told; an agent would relay the note as if it were a failure.
     if (problem && process.stderr.isTTY) {
-      const rest = problem.fix ? nextLine(problem.fix) : `The link works once the viewer is running.\n${nextLine("fathom view")}`;
-      console.error(`fathom: ${problem.why}\n${rest}`);
+      const rest = problem.fix ? nextLine(problem.fix) : `The link works once the viewer is running.\n${nextLine("keylight view")}`;
+      console.error(`keylight: ${problem.why}\n${rest}`);
     }
     if (command === "view" && !argv.includes("--no-open")) {
       // Open the local address: the public one may only resolve from other devices.
@@ -170,20 +170,20 @@ async function main() {
     return;
   }
 
-  fail(`unknown command "${command}".\n${nextLine("fathom help")}`);
+  fail(`unknown command "${command}".\n${nextLine("keylight help")}`);
 }
 
 const RUN_USAGE = [
-  'fathom start <ticket | "description">   create a task and run its workflow',
+  'keylight start <ticket | "description">   create a task and run its workflow',
   "       [--workflow NAME] [--profile NAME] [--name TASK] [--no-run]",
-  "fathom run                       continue the task's workflow from its first unfinished step",
+  "keylight run                       continue the task's workflow from its first unfinished step",
   "       [--from STEP] [--until STEP] [--fresh] [--dry-run] [--workflow NAME] [--profile NAME]",
   "       --from goes back to a step and continues its session; --fresh starts that step over",
-  "fathom status                    the task's steps and how far they are",
-  "fathom worktree                  create the task's worktree and link the task into it",
-  "fathom gate <step> <gate>        print the prompt for a point inside a step",
-  "fathom scratch                   add the visual on stdin to the task's scratch page; print its link",
-  "       [--dir]                   print the page's folder instead (HTML artifacts go beside it)",
+  "keylight status                    the task's steps and how far they are",
+  "keylight worktree                  create the task's worktree and link the task into it",
+  "keylight gate <step> <gate>        print the prompt for a point inside a step",
+  "keylight scratch                   add the visual on stdin to the task's scratch page; print its link",
+  "       [--dir]                     print the page's folder instead (HTML artifacts go beside it)",
 ].join("\n");
 
 async function workflowCommand(config: Config, named: string | undefined): Promise<number> {
@@ -201,8 +201,8 @@ async function workflowCommand(config: Config, named: string | undefined): Promi
   if (command === "status") return printStatus(config, workflows, named);
 
   if (command === "gate") {
-    const [step = process.env.FATHOM_STEP, gate] = positional.length > 1 ? positional : [undefined, positional[0]];
-    if (!step || !gate) fail("usage: fathom gate <step> <gate>   e.g. fathom gate tdd system-design");
+    const [step = process.env.KEYLIGHT_STEP, gate] = positional.length > 1 ? positional : [undefined, positional[0]];
+    if (!step || !gate) fail("usage: keylight gate <step> <gate>   e.g. keylight gate tdd system-design");
     console.log(gatePrompt(step, gate, currentRepo().worktree, config, workflows));
     return 0;
   }
@@ -224,7 +224,7 @@ async function workflowCommand(config: Config, named: string | undefined): Promi
     const seeded = await seed(positional.join(" "), flag(argv, "name"));
     const store = storeOf(repo, config, seeded.task);
     if (existsSync(store) && readState(store)) {
-      fail(`task ${seeded.task} already exists.\n${nextLine(`fathom run --task ${seeded.task}`)}`);
+      fail(`task ${seeded.task} already exists.\n${nextLine(`keylight run --task ${seeded.task}`)}`);
     }
     ensureTask(repo, config, seeded.task, taskSummary(seeded, repo.name));
     initState(store, repo.worktree, workflows, workflow, options.profile ?? workflows.profile);

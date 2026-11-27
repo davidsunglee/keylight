@@ -10,7 +10,7 @@ You are iterating on an existing research questions document based on user feedb
 
 ## Input
 
-- `docPath`: Path to the existing research questions document. When none is given, read [`../fathom/TASKS.md`](../fathom/TASKS.md) and run `fathom task` to find it in the task folder.
+- `docPath`: Path to the existing research questions document. When none is given, read [`../keylight/TASKS.md`](../keylight/TASKS.md) and run `keylight task` to find it in the task folder.
 - Optionally, a ticket file path containing comments with feedback
 
 ## Steps

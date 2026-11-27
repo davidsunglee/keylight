@@ -15,7 +15,7 @@ Documents are unaffected. The viewer renders them, so Mermaid and embedded HTML 
 One command adds the entry at the top of the page, newest first, and prints the page's link:
 
 ````bash
-fathom scratch <<'ENTRY'
+keylight scratch <<'ENTRY'
 ## Q3: Where does the sync run?
 
 ### A: inline in the request
@@ -41,7 +41,7 @@ ENTRY
 - **One entry per message**, holding every visual that message needs.
 - **Head it with the question or topic**, worded as in the message.
 - **Label options as the message does**: A, B, C.
-- **Embed an HTML artifact** by writing its file to the folder `fathom scratch --dir` prints, then putting its `task-artifact` fence in the entry, as [`HTML-ARTIFACTS.md`](HTML-ARTIFACTS.md) describes.
+- **Embed an HTML artifact** by writing its file to the folder `keylight scratch --dir` prints, then putting its `task-artifact` fence in the entry, as [`HTML-ARTIFACTS.md`](HTML-ARTIFACTS.md) describes.
 - **Follow the Mermaid rules** in [`TASKS.md`](TASKS.md), so the diagram parses.
 
 ## In the message

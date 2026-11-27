@@ -1,8 +1,8 @@
 // The worktree step: an isolated checkout for a task, with the task folder
 // linked into it. Settings come from the repository:
 //
-//   .fathom/workspace.json         shared
-//   .fathom/workspace.local.json   local overrides
+//   .keylight/workspace.json         shared
+//   .keylight/workspace.local.json   local overrides
 //
 // With neither, an earlier .humanlayer/workspace.json is read, and failing
 // that the defaults below apply. Nothing is written to the repository.
@@ -29,14 +29,14 @@ interface Workspace {
 
 const DEFAULTS: Workspace = {
   disabled: false,
-  pathTemplate: "~/.fathom/workspaces/{{ TASKSLUG }}/{{ REPOBASENAME }}",
+  pathTemplate: "~/.keylight/workspaces/{{ TASKSLUG }}/{{ REPOBASENAME }}",
   branchTemplate: "{{ TASKSLUG }}",
   repos: [
     {
       localPath: ".",
       sourceRef: "HEAD",
       setupCommand: "",
-      copyGlobs: [".env*", ".claude/settings.local.json", "CLAUDE.local.md", "AGENTS.local.md", ".fathom/workspace.local.json"],
+      copyGlobs: [".env*", ".claude/settings.local.json", "CLAUDE.local.md", "AGENTS.local.md", ".keylight/workspace.local.json"],
     },
   ],
 };
@@ -57,14 +57,14 @@ function readJson(path: string): Partial<Workspace> {
 }
 
 function readWorkspace(checkout: string): Workspace {
-  const shared = join(checkout, ".fathom", "workspace.json");
-  const local = join(checkout, ".fathom", "workspace.local.json");
+  const shared = join(checkout, ".keylight", "workspace.json");
+  const local = join(checkout, ".keylight", "workspace.local.json");
   const earlier = join(checkout, ".humanlayer", "workspace.json");
   let settings: Partial<Workspace> = {};
   if (existsSync(shared)) settings = readJson(shared);
   else if (existsSync(earlier)) {
     settings = readJson(earlier);
-    if (settings.pathTemplate) settings.pathTemplate = settings.pathTemplate.replace("~/.humanlayer/workspaces", "~/.fathom/workspaces");
+    if (settings.pathTemplate) settings.pathTemplate = settings.pathTemplate.replace("~/.humanlayer/workspaces", "~/.keylight/workspaces");
   }
   if (existsSync(local)) settings = { ...settings, ...readJson(local) };
   return { ...DEFAULTS, ...settings, repos: settings.repos?.length ? settings.repos : DEFAULTS.repos };

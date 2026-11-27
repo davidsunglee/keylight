@@ -19,13 +19,13 @@ const EXCLUDE_LINE = "/.artifacts/";
 const SLUG = /^[a-z0-9][a-z0-9._-]*$/;
 
 export const TASK_USAGE = [
-  "fathom task                      show the task linked to this worktree and its files",
-  "fathom task new <task>           create the task folder (or reuse it) and link it here",
-  "fathom task list                 tasks stored for this repository",
-  "fathom task next <kind> <slug>   path for the next numbered document, e.g. next tdd retry-policy",
+  "keylight task                      show the task linked to this worktree and its files",
+  "keylight task new <task>           create the task folder (or reuse it) and link it here",
+  "keylight task list                 tasks stored for this repository",
+  "keylight task next <kind> <slug>   path for the next numbered document, e.g. next tdd retry-policy",
   "",
   "A shared checkout can have several tasks linked. Name the one you mean with",
-  "--task <task> (or FATHOM_TASK) on `fathom task` and `fathom task next`.",
+  "--task <task> (or KEYLIGHT_TASK) on `keylight task` and `keylight task next`.",
 ].join("\n");
 
 export class TaskError extends Error {}
@@ -63,13 +63,13 @@ export function currentTask(repo: Repo, named: string | undefined): string {
   const linked = linkedTasks(repo);
   if (named) {
     if (linked.includes(named)) return named;
-    throw new TaskError(`task "${named}" is not linked to this worktree.\n${nextLine(`fathom task new ${named}`)}`);
+    throw new TaskError(`task "${named}" is not linked to this worktree.\n${nextLine(`keylight task new ${named}`)}`);
   }
   if (linked.length === 1) return linked[0]!;
   if (linked.length === 0) {
     throw new TaskError(
-      `no task is linked to this worktree. \`fathom task list\` shows the ones stored for ${repo.name}.\n` +
-        nextLine("fathom task new <task>"),
+      `no task is linked to this worktree. \`keylight task list\` shows the ones stored for ${repo.name}.\n` +
+        nextLine("keylight task new <task>"),
     );
   }
   throw new TaskError(
@@ -146,7 +146,7 @@ export function ensureTask(repo: Repo, config: Config, task: string, summary?: s
 }
 
 function newTask(repo: Repo, config: Config, task: string | undefined) {
-  if (!task) throw new TaskError("usage: fathom task new <task>   e.g. cor-310-page-offset");
+  if (!task) throw new TaskError("usage: keylight task new <task>   e.g. cor-310-page-offset");
   const { isNew } = ensureTask(repo, config, task);
   console.log(isNew ? `Created task ${task}.` : `Linked existing task ${task}.`);
   printTask(repo, config, task);
@@ -170,7 +170,7 @@ function listTasks(repo: Repo, config: Config) {
 
 function nextDocument(repo: Repo, named: string | undefined, kind: string | undefined, slug: string | undefined) {
   if (!kind || !slug || !SLUG.test(kind) || !SLUG.test(slug)) {
-    throw new TaskError("usage: fathom task next <kind> <slug>   e.g. fathom task next tdd retry-policy");
+    throw new TaskError("usage: keylight task next <kind> <slug>   e.g. keylight task next tdd retry-policy");
   }
   const link = join(repo.worktree, LINK_DIR, currentTask(repo, named));
   const numbers = readdirSync(link).map((name) => Number(/^(\d+)-/.exec(name)?.[1] ?? 0));
@@ -178,7 +178,7 @@ function nextDocument(repo: Repo, named: string | undefined, kind: string | unde
   console.log(show(join(link, `${next}-${kind}-${slug}.md`)));
 }
 
-/** `args` are the positional arguments after `task`; `named` is --task or FATHOM_TASK. Returns the exit status. */
+/** `args` are the positional arguments after `task`; `named` is --task or KEYLIGHT_TASK. Returns the exit status. */
 export function taskCommand(args: string[], config: Config, named: string | undefined): number {
   try {
     const [sub, ...rest] = args;
@@ -191,7 +191,7 @@ export function taskCommand(args: string[], config: Config, named: string | unde
     return 0;
   } catch (err) {
     if (!(err instanceof TaskError)) throw err;
-    console.error(`fathom: ${err.message}`);
+    console.error(`keylight: ${err.message}`);
     return 1;
   }
 }

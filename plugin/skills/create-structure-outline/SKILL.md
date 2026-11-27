@@ -10,8 +10,8 @@ You are creating a phased implementation plan based on research findings and des
 
 ## Input
 
-- Read [`../fathom/TASKS.md`](../fathom/TASKS.md): it covers finding the task folder, naming and formatting documents, and linking them for the user.
-- Run `fathom task` to find the task folder and list its files.
+- Read [`../keylight/TASKS.md`](../keylight/TASKS.md): it covers finding the task folder, naming and formatting documents, and linking them for the user.
+- Run `keylight task` to find the task folder and list its files.
 - If no task is linked and the user named no documents, ask the user what artifacts they would like you to create the outline from.
 
 ## Steps
@@ -26,7 +26,7 @@ You are creating a phased implementation plan based on research findings and des
    - Read all files in the task folder except research questions documents
    - Read relevant files mentioned in the task files
 
-3. **Dispatch sub-agents for follow-up research if necessary**, as [`../fathom/SUBAGENTS.md`](../fathom/SUBAGENTS.md) describes:
+3. **Dispatch sub-agents for follow-up research if necessary**, as [`../keylight/SUBAGENTS.md`](../keylight/SUBAGENTS.md) describes:
 
    - **codebase-locator**: Find additional files if needed
    - **codebase-analyzer**: Deep-dive on specific implementations
@@ -89,9 +89,9 @@ These are intended to be **illustrative**. Not all work lends itself to this typ
 
 1. **Read the structure outline template**: [`structure-outline-template.md`](structure-outline-template.md)
 
-2. **Write the structure outline** to the path that `fathom task next structure-outline <description>` prints.
+2. **Write the structure outline** to the path that `keylight task next structure-outline <description>` prints.
 
-3. **Run the gate**: `fathom gate structure-outline review`. What it prints is a message from the user, delivered now instead of typed. Carry it out in full, exactly as if they had sent it, and fix what it turns up in the outline.
+3. **Run the gate**: `keylight gate structure-outline review`. What it prints is a message from the user, delivered now instead of typed. Carry it out in full, exactly as if they had sent it, and fix what it turns up in the outline.
 
 4. **Respond** with your report on each point of the gate's message, then [`final-answer.md`](final-answer.md) exactly. Do not add a summary or other information.
 

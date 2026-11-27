@@ -16,7 +16,7 @@ You are refining an existing Product Requirements Document (PRD) based on the us
 
 **Run each decision as an interview loop; patch the doc only once the decision is resolved.** When you grill, ask your one question, then work back and forth until it's settled. The user won't always answer outright - they may push back, think out loud, or ask a clarifying question of their own ("well, how would it work if quality finding = 'passing'?"). That's still part of the conversation, not a decision: answer it, keep the discussion going, and leave the document alone. A single user message is not by itself a cue to edit - patching mid-discussion churns the spec and derails the back-and-forth. Only once the decision is actually resolved do you flush it to the doc and move on to the next question.
 
-**Show, don't tell.** When discussing anything visual - UI flows, layouts, interactions, states - update the HTML mockup and show it to the user on the task's scratch page, as [`../fathom/SCRATCH.md`](../fathom/SCRATCH.md) describes: the session runs in a terminal, which cannot display it. A quick sketch communicates more than paragraphs of prose.
+**Show, don't tell.** When discussing anything visual - UI flows, layouts, interactions, states - update the HTML mockup and show it to the user on the task's scratch page, as [`../keylight/SCRATCH.md`](../keylight/SCRATCH.md) describes: the session runs in a terminal, which cannot display it. A quick sketch communicates more than paragraphs of prose.
 
 **Make it read like a document a human designed for other humans.** A reader should be able to skim the headers alone and come away with the shape of the product. Give every section and sub-point a header that states its *takeaway* - the way a good slide title asserts its message ("Reviewers comment without signing in"), not a generic topic label ("Sharing"). Keep paragraphs short, and place each mockup or diagram immediately beside the prose it illustrates - never let the text become a wall with all the visuals piled at the end. When you re-paint a section, fix these too: split walls of text, add takeaway headers, and pull mockups up next to their prose.
 
@@ -58,7 +58,7 @@ If the user asks to "continue working through questions" or "keep grilling" or s
 ## Steps
 
 1. **Find and read the task directory**:
-   - Read [`../fathom/TASKS.md`](../fathom/TASKS.md), then run `fathom task` to find all related documents in the task folder
+   - Read [`../keylight/TASKS.md`](../keylight/TASKS.md), then run `keylight task` to find all related documents in the task folder
    - Read ALL files in the task directory, including the current PRD and prior artifacts (`ticket.md` or `task.md`, research, mockups, etc.)
    - **IMPORTANT**: Read entire files, never partially
 
@@ -70,7 +70,7 @@ If the user asks to "continue working through questions" or "keep grilling" or s
 
 3. **Optional - Dispatch parallel sub-agents for research**:
    - If not clear from existing context, dispatch sub-agents to research different aspects concurrently
-   - Use the right brief for each type of research, dispatched as [`../fathom/SUBAGENTS.md`](../fathom/SUBAGENTS.md) describes:
+   - Use the right brief for each type of research, dispatched as [`../keylight/SUBAGENTS.md`](../keylight/SUBAGENTS.md) describes:
 
    **For deeper investigation:**
    - **codebase-locator** - To find more specific files (e.g., "find all files that handle [specific component]")
@@ -144,7 +144,7 @@ If the ticket says one thing but the PRD resolved it differently, follow the PRD
 Mockups are how you communicate visually. Use them liberally when discussing UI.
 
 **Creating mockups:**
-- Write each mockup as `mockup-<description>.html`, following [`../fathom/HTML-ARTIFACTS.md`](../fathom/HTML-ARTIFACTS.md) for where it goes, how to embed it in the PRD, and how to show it in conversation
+- Write each mockup as `mockup-<description>.html`, following [`../keylight/HTML-ARTIFACTS.md`](../keylight/HTML-ARTIFACTS.md) for where it goes, how to embed it in the PRD, and how to show it in conversation
 - Check research for design system details (colors, fonts, components) - follow those patterns rather than the artifact template
 - Keep mockups focused on the decision at hand
 - Use realistic labels, not lorem ipsum

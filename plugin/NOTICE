@@ -4,5 +4,5 @@ HumanLayer's "rpi" Research-Plan-Implement plugin and its companion plugins
 the Apache License, Version 2.0. See LICENSE.
 
 They have been modified: HumanLayer-specific paths, hooks, cloud links, and
-application references were replaced with fathom's task folders, command, and
-viewer, and shared guidance was moved into the `fathom` skill.
+application references were replaced with keylight's task folders, command, and
+viewer, and shared guidance was moved into the `keylight` skill.
