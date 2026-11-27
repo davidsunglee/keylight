@@ -1,0 +1,128 @@
+---
+name: review-loop
+description: Runs the two-axis Codex review headlessly, remediates the findings it returns, and re-reviews the residuals round after round until clean. Use when the user wants changes reviewed by Codex, review findings verified and remediated, or a review looped until no findings remain.
+---
+
+Codex reviews, a dedicated subagent remediates, and the loop repeats until **clean**. One **round** is review → remediate → judge. Rounds continue on their own; the loop stops only at a **gate**.
+
+**Clean** is the terminal state: no `blocking` and no `should-fix` finding on either axis. Nits alone are clean.
+
+Before the first round, read [`FINDING-QUALITY.md`](FINDING-QUALITY.md). Its credible-finding threshold and proportional-remediation rule govern every review, remediation, and judgment in the loop.
+
+Findings move as a **file**, never as prose you retype. Every path, line number, and quotation the reviewer emits reaches the remediating agent byte-identical — transcription is where paths break.
+
+One **defect class** is one violated invariant or required repair wherever it credibly occurs in the reviewed change. The reviewer reports the class once, with every supported or plausible site attached.
+
+The **ledger** at `<boundary-dir>/ledger.jsonl` is the loop's memory: one JSON object per finding answered, carrying `round`, `id`, `outcome`, and `summary`. Which findings have recurred, how long each has been open, and whether a fix undid an earlier one are facts to look up there, not things to carry across a ten-minute background wait. Keep it one-line-per-finding — work not answering a finding, like a codebase-wide sweep, belongs in `remediation.md`, because an entry with no finding id is one the recurrence lookup cannot read.
+
+Commands here and in the host branches use `$SKILL`: this skill's directory, the folder holding this file, as an absolute path.
+
+## Invoking host
+
+Before launching the first reviewer process, read the first matching host branch:
+
+- When `test -n "${HUMANLAYER_SESSION_ID:-}"` succeeds, read [`BOUNDED-BASH-HOST.md`](BOUNDED-BASH-HOST.md).
+- Otherwise, from native Codex when the shell tool returns a resumable `session_id`, read [`CODEX-HOST.md`](CODEX-HOST.md).
+- Otherwise, from native Claude Code when Bash offers `run_in_background`, read [`CLAUDE-CODE-HOST.md`](CLAUDE-CODE-HOST.md).
+- Otherwise, when Bash has no resumable session handle, read [`BOUNDED-BASH-HOST.md`](BOUNDED-BASH-HOST.md). CodeLayer uses this branch even when its model is Codex.
+
+The selected branch governs process launch, waiting, and remediator dispatch for the whole loop. Return here after each host-specific action.
+
+## Gates
+
+Three conditions hand the loop back to the user. Everything else advances into the next round without asking.
+
+- **Design decision** — the remediator returned a finding `deferred`. Surface its analysis as written, in prose: the finding, each option with what it buys and what it costs, and the recommendation with the reasoning behind it. Then wait — the choice is the user's, and their answer is round N+1's input.
+- **Round 5 not clean** — round 5's review returned findings. Stop before sending a sixth. Report what survived, and with it the trajectory: findings per round, and the remediator's read on whether the loop was converging. Five rounds of shrinking, credible findings may be a large change still being worked through; five rounds of the same size or progressively less credible variants is churn. The user is deciding whether to keep going, so give them the shape of it rather than the last round alone.
+- **Non-convergence** — the remediator reported a reversal, cycle, unchanged restatement, or speculative spiral. Surface its ledger-backed evidence and stop, because another round repeats the state or searches progressively less credible variants. A recurring finding remains convergence only when new evidence exposes a credible supported failure left by the prior repair.
+
+## 1. Pin the round
+
+Establish seven things, and resolve each rather than asking:
+
+- **Worktree** — absolute path to the checkout under review: the one you were given, otherwise the checkout this session runs in.
+- **Fixed point** — the commit the diff is measured from. A review prompt's front matter carries `base`; otherwise it is the merge-base with `main`.
+- **Review prompt** — the `NN-review-prompt-*.md` in the task folder that covers this boundary. It must name the spec and the standards files the change is measured against, including directory-scoped ones: headless, every source it leaves out is one the round runs without. Absent, write it first — [`REVIEW-PROMPT.md`](REVIEW-PROMPT.md) covers what it carries and who writes it.
+- **Frame** — what this loop is entitled to judge, fixed at round 1: the behaviour the change introduces, measured against the review prompt's spec and standards. A finding is in frame when it names a line the change introduced or modified, or a requirement the review prompt named that the change left unmet. The task's own artifacts — outline, review prompt, ledger, remediation notes — are the loop's **instruments**: the reviewer reads them to judge the change and reports against the change.
+- **Boundary** — the review this loop serves, named for the scope its review prompt covers: `phase-2`, `phases-3-4`. A task meets several, each opening its own thread against its own fixed point, so each takes its own directory at `<store>/review-loop/<boundary>/`. `<store>` is the artifact directory you were given, otherwise the `store` path that `keylight task` prints, never its `dir` link ([`../keylight/TASKS.md`](../keylight/TASKS.md)). Rounds are counted, ledgers are read, and the round-5 **gate** is judged inside one boundary — never across the task. The directory name is also how a later session says which loop it is resuming.
+- **Ledger** — `<boundary-dir>/ledger.jsonl`, initialized as an empty file when this is round 1 and no ledger exists. A finding from an earlier boundary, raised against code this one does not cover, is not a recurrence.
+- **Round directory** — `<boundary-dir>/round-<NN>/`, created now.
+
+Done when `git rev-parse <fixed-point>` resolves inside the worktree, `git diff <fixed-point>...HEAD` is non-empty, and `git status --short` is empty. The reviewer measures committed changes through `HEAD`; a bad ref, empty diff, or dirty worktree fails here rather than disappearing from the review.
+
+## 2. Send the round to Codex
+
+Round 1 opens a **thread**; later rounds resume it, so the reviewer keeps what it already flagged.
+
+Set `$ROUND` to the current round directory. From round 2 on, set `$PREVIOUS_ROUND` to the preceding directory and load `$THREAD_ID` from its `thread-id` file.
+
+Round 1:
+
+```bash
+codex exec \
+  -C "$WORKTREE" -s read-only \
+  -m gpt-6.2-sol -c model_reasoning_effort=high \
+  --output-schema "$SKILL/findings-schema.json" \
+  -o "$ROUND/findings.json" \
+  "Run the code-review skill.
+Read and apply the finding threshold at $SKILL/FINDING-QUALITY.md.
+Fixed point: $BASE
+Review prompt: $PROMPT_PATH
+Report every defect class through the output schema, naming every site where it occurs.
+Every finding names a line this change introduced or modified, or a review-prompt requirement it left unmet."
+```
+
+Rounds 2+, against the id recorded last round:
+
+```bash
+codex exec \
+  -C "$WORKTREE" -s read-only \
+  -m gpt-6.2-sol -c model_reasoning_effort=high \
+  --output-schema "$SKILL/findings-schema.json" \
+  -o "$ROUND/findings.json" \
+  resume "$THREAD_ID" \
+  "The prior findings were remediated in: $PREVIOUS_ROUND/remediation.md
+Read and apply the finding threshold at $SKILL/FINDING-QUALITY.md.
+This is a convergence pass. Re-verify each prior finding against the current tree, and review the remediation commits for credible regressions they introduce. For every genuinely new finding, state the new evidence that makes its trigger credible.
+$RECURRENCE
+Report residuals and anything new through the output schema, reusing ids for findings that still stand. Report each defect class once, with every remaining site attached.
+Every finding names a line this change introduced or modified, or a review-prompt requirement it left unmet."
+```
+
+`$RECURRENCE` is built from the ledger: name every id raised more than once and how many rounds it has been open. A reviewer that knows it is restating a claim for the fourth time weighs it differently than one that believes it is finding it fresh.
+
+Launch and wait using the selected host branch. Reviews take upwards of ten minutes, so keep the wait attached to the host's long-running execution mechanism until it reports a terminal state. The host branch supplies the log redirection and `</dev/null`; without EOF on stdin, Codex reads stdin and blocks forever.
+
+When the round returns, record its thread id — round N+1 resumes against it, and a round that ends at a **gate** may sit for hours before that happens:
+
+```bash
+rg -m1 '^session id:' "$ROUND/codex.log" | awk '{print $NF}' >"$ROUND/thread-id"
+```
+
+Done when `findings.json` parses, `codex.log` ends in a non-error exit, the thread id is recorded, and — from round 2 on — `$RECURRENCE` was non-empty whenever the ledger held a repeat. A truncated or empty file means the review died — read the log tail before retrying, and never fabricate the round's findings.
+
+## 3. Remediate
+
+A round whose verdict is `clean` has nothing to remediate: go to step 4.
+
+Using the selected host branch, dispatch one remediator sub-agent with the worktree, the path to `$ROUND/findings.json`, the path to the ledger, and the round number. Point it at the files; its brief is [`REMEDIATOR.md`](REMEDIATOR.md).
+
+Every finding goes to it, whatever its severity — including the ones the reviewer marked `requires_design_decision`, which it analyses rather than repairs. Fixed, rebutted, or deferred all turn on reading the cited code and applying the credible-finding threshold, so each is decided there rather than pre-judged here from the reviewer's prose.
+
+It writes `$ROUND/remediation.md`, which is what round N+1 sends back to the reviewer.
+
+Done when `remediation.md` carries an outcome for every id in `findings.json`, every outcome is appended to the ledger, the repository's verification gates pass, every fix is committed, and `git status --short` is empty. A finding left without an outcome is one the loop will report clean over. A round left out of the ledger is invisible to every later recurrence lookup, and the round most often lost is the one before a **gate** — the round whose state a later session has to pick up.
+
+## 4. Judge the round
+
+**Clean** ends the loop — report the rounds spent and what each fixed.
+
+Otherwise check the gates. Two are read off what the remediator returned — a finding it `deferred`, or a report that the loop has stopped settling. The third is the round count.
+
+Absent a gate, create round N+1's directory and start step 2 immediately.
+
+Done when the loop has either ended or entered the next round's step 2. A turn that ends by narrating what the round did is the loop stalling.
+
+## Reviewer mechanics
+
+Flags, model and sandbox overrides, thread recovery, and the failure modes of headless `codex exec` are in [`CODEX-REVIEWER.md`](CODEX-REVIEWER.md). Reach for it when a round exits non-zero, hangs, returns unparseable output, or you need to resume a thread whose id was lost.

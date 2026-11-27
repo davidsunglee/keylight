@@ -22,6 +22,7 @@ Three workflows string the stages together, and `keylight run` takes a task thro
 | Worktree | `kl:setup-worktree` | An isolated checkout linked to the task |
 | Implementation | `kl:implement-outline` | The code, one phase at a time |
 | Implementation, direct | `kl:implement-decisions` | The code, straight from a decisions document |
+| Review | `kl:review-loop` | Review findings settled round by round until clean |
 | Pull request | `kl:describe-pr` | The PR description |
 
 Each document has an `iterate-` skill (`kl:iterate-tdd`, `kl:iterate-research`, …) that revises it in place. `kl:show-me` explains anything visually along the way.

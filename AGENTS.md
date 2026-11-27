@@ -19,7 +19,7 @@ Design principles are in [`CODING_STANDARDS.md`](CODING_STANDARDS.md).
 ## Skills
 
 - Write and edit skills following the `writing-for-agents` skill.
-- Skills from outside this repository (`grilling`, `review-loop`) are used by name and never edited from here.
+- Skills from outside this repository (`grilling`, `code-review`) are used by name and never edited from here.
 
 ## Verification
 

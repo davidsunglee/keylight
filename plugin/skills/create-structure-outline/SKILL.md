@@ -117,7 +117,7 @@ Be tasteful and thoughtful about how and where you include code snippets, and pr
 Each phase has a `### Validation` section with three subsections:
 - `#### Automated Verification`: runnable commands (typecheck, tests, lint)
 - `#### Manual Verification`: steps requiring human judgment
-- `#### Review`: yes or no, and why in a few words. On yes, the implementation runs `review-loop` on the phase once it is committed.
+- `#### Review`: yes or no, and why in a few words. On yes, the implementation runs `kl:review-loop` on the phase once it is committed.
 
 **Review rule**: a phase gets a review when any part of it changes behavior, test infrastructure or CI. A phase that only formats, renames or moves code does not.
 
