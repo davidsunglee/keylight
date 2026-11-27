@@ -3,6 +3,7 @@
 // A ticket is fetched by code. A description gets one small model call to
 // propose a title and a task name; pass --name to skip it.
 
+import { namingCommand } from "./harness";
 import { ask, nextLine } from "./say";
 import { TaskError } from "./task";
 
@@ -18,7 +19,7 @@ export interface Seed {
 const TICKET = /^[A-Za-z][A-Za-z0-9]*-\d+$/;
 const LINEAR_URL = /linear\.app\/[^/]+\/issue\/([A-Za-z][A-Za-z0-9]*-\d+)/;
 
-export function slugify(text: string, words = 6): string {
+function taskSlug(text: string, words = 6): string {
   return text
     .toLowerCase()
     .normalize("NFKD")
@@ -32,7 +33,7 @@ export function slugify(text: string, words = 6): string {
     .replace(/-+$/, "");
 }
 
-export function ticketId(input: string): string | null {
+function ticketId(input: string): string | null {
   const text = input.trim();
   if (TICKET.test(text)) return text.toUpperCase();
   return LINEAR_URL.exec(text)?.[1]?.toUpperCase() ?? null;
@@ -46,13 +47,13 @@ interface LinearIssue {
   comments: { nodes: { body: string; createdAt: string; user: { name: string } | null }[] };
 }
 
-export function seedFromIssue(issue: LinearIssue, name?: string): Seed {
+function seedFromIssue(issue: LinearIssue, name?: string): Seed {
   const comments = issue.comments.nodes
     .slice()
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
     .map((c) => `**${c.user?.name ?? "Someone"}, ${c.createdAt.slice(0, 10)}**\n\n${c.body.trim()}`);
   return {
-    task: name ?? `${issue.identifier.toLowerCase()}-${slugify(issue.title)}`.replace(/-+$/, ""),
+    task: name ?? `${issue.identifier.toLowerCase()}-${taskSlug(issue.title)}`.replace(/-+$/, ""),
     title: `${issue.identifier}: ${issue.title}`,
     body: [
       issue.description?.trim() || "(The ticket has no description.)",
@@ -89,12 +90,14 @@ async function fetchLinear(id: string): Promise<LinearIssue> {
 /** One small model call: a title and a task name for a description. Falls back to the first words. */
 function proposeName(description: string): { title: string; task: string } {
   const firstLine = description.split("\n")[0]!.trim();
-  const fallback = { title: firstLine.slice(0, 80), task: slugify(description) };
+  const fallback = { title: firstLine.slice(0, 80), task: taskSlug(description) };
   const prompt =
     `Name this piece of software work. Reply with one line of JSON and nothing else: ` +
     `{"title": "<up to 8 words, sentence case>", "slug": "<2 to 5 lowercase words joined by dashes>"}\n\n${description}`;
   try {
-    const result = Bun.spawnSync(["claude", "-p", prompt, "--model", "haiku"], {
+    const result = Bun.spawnSync(namingCommand(prompt), {
+      // Bun would otherwise start the child with the environment this process began with.
+      env: process.env,
       stdout: "pipe",
       stderr: "ignore",
       stdin: "ignore",
@@ -104,7 +107,7 @@ function proposeName(description: string): { title: string; task: string } {
       title?: string;
       slug?: string;
     };
-    const task = slugify(parsed.slug ?? "");
+    const task = taskSlug(parsed.slug ?? "");
     return task && parsed.title ? { title: parsed.title, task } : fallback;
   } catch {
     return fallback;

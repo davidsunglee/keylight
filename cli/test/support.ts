@@ -2,16 +2,19 @@
 // directory, environment, terminal, output) and undoes it when disposed, so a
 // test holds one with `using` and the next test starts clean.
 
-import { cpSync, mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { format } from "node:util";
 import type { Subprocess } from "bun";
 import { runCommand } from "../commands";
 import { ensureTask } from "../task";
-import { removeAfterRun, terminal } from "./preload";
+import type { Act, Launch } from "./fakes/harness";
+import { home as homeDir, removeAfterRun, terminal } from "./preload";
 
 export const ENTRY = join(import.meta.dir, "..", "keylight.ts");
+/** Recorded Claude Code transcripts, sanitized. */
+export const FIXTURES = join(import.meta.dir, "fixtures");
 
 export interface Output {
   code: number;
@@ -116,12 +119,14 @@ export interface TempRepo extends Disposable {
   viewer: StandInViewer;
   /** A scratch directory beside the repository, for anything a test needs outside it. */
   outside: string;
+  /** The home directory while the fixture lives. */
+  home: string;
   store(task: string): string;
 }
 
 /**
- * A repository with one empty commit, its own artifact root and config
- * directory, and a stand-in viewer on KEYLIGHT_PORT. `tasks` are created and
+ * A repository with one empty commit, its own artifact root, config and home
+ * directories, and a stand-in viewer on KEYLIGHT_PORT. `tasks` are created and
  * linked as `keylight task new` would.
  */
 export function tempRepo(options: { tasks?: string[] } = {}): TempRepo {
@@ -131,7 +136,8 @@ export function tempRepo(options: { tasks?: string[] } = {}): TempRepo {
   const root = join(base, "artifacts");
   const configDir = join(base, "config");
   const outside = join(base, "outside");
-  for (const dir of [root, configDir, outside]) mkdirSync(dir, { recursive: true });
+  const home = join(base, "home");
+  for (const dir of [root, configDir, outside, home]) mkdirSync(dir, { recursive: true });
   copyRepository(worktree);
   const viewer = standInViewer(root);
   const env = scopedEnv({
@@ -140,12 +146,17 @@ export function tempRepo(options: { tasks?: string[] } = {}): TempRepo {
     KEYLIGHT_PORT: String(viewer.port),
     KEYLIGHT_PUBLIC_URL: undefined,
     KEYLIGHT_TASK: undefined,
+    KEYLIGHT_TASK_DIR: undefined,
     KEYLIGHT_STEP: undefined,
+    KEYLIGHT_WORKTREE: undefined,
+    KEYLIGHT_BASE: undefined,
     XDG_CONFIG_HOME: undefined,
     LINEAR_API_KEY: undefined,
   });
   const cwd = process.cwd();
   process.chdir(worktree);
+  const savedHome = homeDir.path;
+  homeDir.path = home;
   const fixture: TempRepo = {
     worktree,
     name,
@@ -153,9 +164,11 @@ export function tempRepo(options: { tasks?: string[] } = {}): TempRepo {
     configDir,
     viewer,
     outside,
+    home,
     store: (task) => join(root, name, task),
     [Symbol.dispose]: () => {
       process.chdir(cwd);
+      homeDir.path = savedHome;
       env[Symbol.dispose]();
       viewer[Symbol.dispose]();
       rmSync(base, { recursive: true, force: true });
@@ -169,6 +182,51 @@ export function tempRepo(options: { tasks?: string[] } = {}): TempRepo {
     throw err;
   }
   return fixture;
+}
+
+export interface FakeHarness extends Disposable {
+  /** Where an interactive Codex session is filed (CODEX_HOME). */
+  codexHome: string;
+  /** What the fakes do for each step, one Act per launch in order. Replaces the plan's unused acts. */
+  plan(acts: Record<string, Act[]>): void;
+  /** Every launch so far, oldest first. */
+  launches(): Launch[];
+  /** What `<command> --help` prints, for a command such as "claude" or "codex exec". */
+  help(command: string, text: string): void;
+}
+
+/** Puts fake `claude` and `codex` executables first on PATH until disposed. See fakes/harness.ts. */
+export function fakeHarness(): FakeHarness {
+  const dir = makeTempDir();
+  const codexHome = join(dir, "codex");
+  const env = scopedEnv({
+    PATH: `${join(import.meta.dir, "fakes")}:${process.env.PATH}`,
+    FAKE_HARNESS_DIR: dir,
+    CODEX_HOME: codexHome,
+    CLAUDE_CODE_SUBAGENT_MODEL: undefined,
+    CLAUDE_CODE_SUBAGENT_MODEL_FORCE: undefined,
+    CLAUDE_CODE_SUBAGENT_EFFORT: undefined,
+  });
+  const launches = join(dir, "launches.jsonl");
+  return {
+    codexHome,
+    plan: (acts) => writeFileSync(join(dir, "plan.json"), JSON.stringify(acts)),
+    launches: () =>
+      existsSync(launches)
+        ? readFileSync(launches, "utf8")
+            .trim()
+            .split("\n")
+            .map((line) => JSON.parse(line) as Launch)
+        : [],
+    help: (command, text) => {
+      mkdirSync(join(dir, "help"), { recursive: true });
+      writeFileSync(join(dir, "help", `${command}.txt`), text);
+    },
+    [Symbol.dispose]: () => {
+      env[Symbol.dispose]();
+      rmSync(dir, { recursive: true, force: true });
+    },
+  };
 }
 
 /** Every stream reports a terminal, and each question takes the next of `answers`. */
