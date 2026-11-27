@@ -8,7 +8,7 @@
 // What cannot be read from the task's documents is kept in <task>/.keylight.json:
 // the workflow, the profile, where the work happens, and which steps are done.
 
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, relative } from "node:path";
 import type { Config } from "./config";
@@ -150,7 +150,7 @@ function openingMessage(name: string, step: Step, launch: Launch, cwd: string, c
 
 interface Session {
   argv: string[];
-  /** Claude Code session id, when the harness lets us choose one. */
+  /** Known before launch only when Claude Code is given one or a session is resumed. Codex names its own. */
   id?: string;
 }
 
@@ -170,13 +170,42 @@ function sessionCommand(name: string, step: Step, launch: Launch, message: strin
     argv.push(...extra, "--add-dir", store);
     return { argv, id };
   }
-  const argv = headless ? ["codex", "exec"] : ["codex"];
+  const argv = headless ? ["codex", "exec"] : resume ? ["codex", "resume"] : ["codex"];
   if (launch.model) argv.push("-m", launch.model);
   if (launch.effort) argv.push("-c", `model_reasoning_effort="${launch.effort}"`);
   // Codex refuses --add-dir unless the sandbox allows writing, so the task folder needs this in both modes.
   argv.push("-s", launch.permissions ?? "workspace-write");
-  argv.push("--add-dir", store, ...extra, message);
-  return { argv };
+  argv.push("--add-dir", store, ...extra, resume ?? message);
+  return { argv, id: resume };
+}
+
+/**
+ * The id of the interactive Codex session started in `cwd` since `launched`,
+ * read from the session files Codex keeps (one folder per local day, the
+ * first line of each file describing the session). Undefined when none is
+ * found, which leaves the step without a session to resume.
+ */
+function codexSessionSince(cwd: string, launched: Date): string | undefined {
+  const home = process.env.CODEX_HOME ?? join(homedir(), ".codex");
+  const dayDir = (day: Date) =>
+    join(home, "sessions", String(day.getFullYear()), String(day.getMonth() + 1).padStart(2, "0"), String(day.getDate()).padStart(2, "0"));
+  const started: { id: string; at: string }[] = [];
+  for (const dir of new Set([dayDir(launched), dayDir(new Date())])) {
+    if (!existsSync(dir)) continue;
+    for (const name of readdirSync(dir)) {
+      const file = join(dir, name);
+      try {
+        if (!name.endsWith(".jsonl") || statSync(file).mtime < launched) continue;
+        const meta = JSON.parse(readFileSync(file, "utf8").split("\n", 1)[0]!).payload;
+        // Codex also files its own helper threads here; only the one the user talks to can be resumed.
+        const ours = meta.thread_source === "user" && [cwd, realpathSync(cwd)].includes(meta.cwd) && new Date(meta.timestamp) >= launched;
+        if (ours) started.push({ id: meta.id, at: meta.timestamp });
+      } catch {
+        // Not a session file this code can read.
+      }
+    }
+  }
+  return started.sort((a, b) => a.at.localeCompare(b.at))[0]?.id;
 }
 
 function shellQuote(argv: string[]): string {
@@ -356,6 +385,7 @@ async function runStep(name: string, ctx: Context, dryRun: boolean, next: string
   }
 
   mark("started", { harness: launch.harness, session: session.id });
+  const launched = new Date();
   const env = { ...stepEnv(ctx, name), ...subagents };
   if (step.session === "headless" && launch.harness === "claude") {
     const log = logFile(ctx, name);
@@ -366,6 +396,7 @@ async function runStep(name: string, ctx: Context, dryRun: boolean, next: string
     const child = Bun.spawn(session.argv, { cwd, env, stdio: [headless ? "ignore" : "inherit", "inherit", "inherit"] });
     const code = await child.exited;
     if (headless && code !== 0) return { problem: `the session exited with status ${code}` };
+    if (!headless && !session.id && launch.harness === "codex") mark("started", { session: codexSessionSince(cwd, launched) });
   }
 
   const problem = unmet(step, ctx, cwd);

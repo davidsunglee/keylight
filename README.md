@@ -88,8 +88,8 @@ keylight status                         # the steps and how far they are
 - **Interactive steps** are ordinary sessions. When you quit one, the runner
   asks whether the step is finished: yes and start the next, yes and stop, or
   not yet. "Not yet" keeps the step open, and the next `keylight run` resumes the
-  same Claude Code session (a Codex step starts a new one). `confirm: false`
-  on the step skips the question.
+  same session, in Claude Code and in Codex. `confirm: false` on the step skips
+  the question.
 - **A step is finished when its evidence is there**: its document exists, or
   every phase heading in the decisions document carries ✅, or its `check`
   command passes. Otherwise the runner stops and says what is missing.
