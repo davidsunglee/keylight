@@ -5,8 +5,8 @@
 // Opens every document that contains a Mermaid block (every document with
 // --all), renders each diagram, and reports any that fail or never appear, plus
 // a document route that answers other than 200 (a redirect included), artifacts
-// not found, script errors and layout overflow. Exits 1 on any issue or when no
-// document matches.
+// not found or not loading, script errors and layout overflow. Exits 1 on any
+// issue or when no document matches.
 //
 //   bun viewer/test/render-check.ts --root DIR [--port N] [--limit N] [--match TEXT]
 //                                   [--shots DIR] [--mobile] [--all]
@@ -16,7 +16,7 @@ import { join, relative } from "node:path";
 import MarkdownIt from "markdown-it";
 import { devices, webkit } from "playwright";
 import { flag, loadConfig } from "../../cli/config";
-import { urlPath } from "../render";
+import { splitFrontmatter, urlPath } from "../render";
 
 const argv = process.argv.slice(2);
 const config = loadConfig(argv);
@@ -41,16 +41,19 @@ function findDocs(dir: string, out: string[] = []): string[] {
 const parser = new MarkdownIt({ html: true });
 function mermaidFences(file: string): number {
   return parser
-    .parse(readFileSync(file, "utf8"), {})
+    .parse(splitFrontmatter(readFileSync(file, "utf8")).body, {})
     .filter((t) => t.type === "fence" && t.info.trim().split(/\s+/)[0]?.toLowerCase() === "mermaid").length;
 }
 
-const docs = findDocs(config.root)
+const docs: { file: string; fences: number }[] = [];
+// Newest first, reading only as many files as the selection needs.
+for (const file of findDocs(config.root)
   .filter((f) => !match || f.includes(match))
-  .map((file) => ({ file, fences: mermaidFences(file) }))
-  .filter((doc) => all || doc.fences > 0)
-  .sort((a, b) => statSync(b.file).mtimeMs - statSync(a.file).mtimeMs)
-  .slice(0, limit);
+  .sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)) {
+  if (docs.length >= limit) break;
+  const fences = mermaidFences(file);
+  if (all || fences > 0) docs.push({ file, fences });
+}
 
 if (docs.length === 0) {
   console.log(`No documents matched under ${config.root}.`);
@@ -77,6 +80,10 @@ for (const [i, { file, fences }] of docs.entries()) {
   page.on("console", (msg) => {
     if (msg.type() === "error") issues.push(`console: ${msg.text().slice(0, 200)}`);
   });
+  const frameStatuses = new Map<string, number>();
+  page.on("response", (r) => {
+    if (r.request().isNavigationRequest() && r.frame() !== page.mainFrame()) frameStatuses.set(r.url(), r.status());
+  });
 
   const response = await page.goto(`http://localhost:${config.port}/view/${urlPath(rel)}`, { waitUntil: "load" });
   // goto resolves with the response at the end of any redirects; the document route itself must answer.
@@ -84,6 +91,18 @@ for (const [i, { file, fences }] of docs.entries()) {
   while (request?.redirectedFrom()) request = request.redirectedFrom();
   const status = (await request?.response())?.status();
   if (status !== 200) issues.push(`HTTP ${status ?? "no response"}`);
+  // Embedded artifacts load lazily, so each frame is scrolled to before its response is checked.
+  for (const embed of await page.locator("iframe.embed-frame").all()) {
+    const src = await embed.evaluate((el: HTMLIFrameElement) => el.src);
+    await embed.scrollIntoViewIfNeeded();
+    const frameStatus =
+      frameStatuses.get(src) ??
+      (await page.waitForResponse(src, { timeout: 15000 }).then(
+        (r) => r.status(),
+        () => undefined,
+      ));
+    if (frameStatus !== 200) issues.push(`embedded artifact ${src}: HTTP ${frameStatus ?? "no response"}`);
+  }
   const result = await page.evaluate(async () => {
     const blocks = [...document.querySelectorAll<HTMLElement>(".mermaid-block")];
     const errors: string[] = [];
