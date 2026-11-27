@@ -9,7 +9,7 @@ import { basename, join } from "node:path";
 import type { Config } from "./config";
 import { currentRepo, currentTask, linkedTasks, storeOf, TaskError, type Repo } from "./task";
 
-export const SCRATCH_FILE = "scratch.md";
+const SCRATCH_FILE = "scratch.md";
 
 export function scratchHome(config: Config, named: string | undefined): { dir: string; label: string } {
   let repo: Repo;
