@@ -24,7 +24,7 @@ Design principles are in [`CODING_STANDARDS.md`](CODING_STANDARDS.md).
 ## Verification
 
 - `bun run check` must pass.
-- Verify a viewer change with `viewer/test/parity.ts`, desktop and `--mobile`.
+- Verify a viewer change with `bun run check:browser`, which checks desktop and phone width.
 - Verify a skill or runner change by running it in a real session in a scratch repository. Reading the skill is not verification.
 - Launch test sessions on cheaper models at medium effort: `opus` or `sonnet` in Claude Code, `gpt-6.2-sol` or `gpt-6.1-terra` in Codex.
 
