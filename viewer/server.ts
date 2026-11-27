@@ -66,6 +66,8 @@ function watchThemes(configDir: string): WatchedThemes {
   let cache: ThemeSet | null = null;
   let watchers: FSWatcher[] = [];
   let timer: ReturnType<typeof setTimeout> | undefined;
+  // A request still in flight when the viewer stops must not watch again.
+  let closed = false;
   const unwatch = () => {
     for (const watcher of watchers) watcher.close();
     watchers = [];
@@ -82,7 +84,7 @@ function watchThemes(configDir: string): WatchedThemes {
   return {
     listeners,
     current() {
-      if (!watchers.length) {
+      if (!watchers.length && !closed) {
         for (const dir of [configDir, join(configDir, "themes")]) {
           if (existsSync(dir)) watchers.push(watch(dir, changed));
         }
@@ -92,6 +94,7 @@ function watchThemes(configDir: string): WatchedThemes {
       return cache;
     },
     close() {
+      closed = true;
       clearTimeout(timer);
       unwatch();
     },
@@ -161,14 +164,17 @@ function listDir(root: string, dir: string): Entry[] {
   for (const d of readdirSync(dir, { withFileTypes: true })) {
     if (d.name.startsWith(".") || d.name === "node_modules") continue;
     const abs = join(dir, d.name);
+    const rel = relative(root, abs);
+    // A symlink that is broken or leaves the root is never served, so it is not listed.
+    if (d.isSymbolicLink() && !locate(root, rel)) continue;
     let stat;
     try {
       stat = statSync(abs);
     } catch {
-      continue; // Broken symlink.
+      continue; // Removed since the directory was read.
     }
     const kind = entryKind(d.name, stat.isDirectory());
-    if (kind) out.push({ name: d.name, rel: relative(root, abs), mtime: stat.mtimeMs, kind });
+    if (kind) out.push({ name: d.name, rel, mtime: stat.mtimeMs, kind });
   }
   return out.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
 }
@@ -231,7 +237,7 @@ function taskAt(root: string, dir: string, files: Entry[]): Task {
   };
 }
 
-/** Directories named by ID get a readable name from their first staged entry. */
+/** Directories named by ID get a readable name from the first staged entry with a slug. */
 function readableName(dir: string, entries: Entry[]): string | undefined {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(basename(dir))) return undefined;
   return entries.map((e) => docKind(e.name)?.slug).find(Boolean);
@@ -302,8 +308,8 @@ function crumbs(rel: string, taskName?: string): string {
   return ['<a href="/" class="home">Artifacts</a>', ...links].join('<span class="sep">/</span>');
 }
 
-function fileList(root: string, dir: string, current?: string): string {
-  const items = listDir(root, dir)
+function fileList(entries: Entry[], current: string): string {
+  const items = entries
     .filter((e) => e.kind !== "dir")
     .map((e) => {
       const stage = docKind(e.name);
@@ -355,13 +361,13 @@ interface DocView {
   version: string;
 }
 
-async function docView(root: string, abs: string): Promise<DocView> {
+async function docView(root: string, abs: string, entries = listDir(root, dirname(abs))): Promise<DocView> {
   const stat = statSync(abs);
   const rendered = renderMarkdown(await Bun.file(abs).text(), abs, root);
   return {
     title: rendered.title,
     html: rendered.html,
-    files: fileList(root, dirname(abs), relative(root, abs)),
+    files: fileList(entries, relative(root, abs)),
     outline: outlineList(rendered.outline),
     version: `${stat.mtimeMs}-${stat.size}`,
   };
@@ -369,12 +375,12 @@ async function docView(root: string, abs: string): Promise<DocView> {
 
 async function docPage(site: Site, abs: string): Promise<string> {
   const rel = relative(site.root, abs);
-  const view = await docView(site.root, abs);
   const dir = dirname(abs);
-  const taskName = readableName(dir, listDir(site.root, dir));
+  const entries = listDir(site.root, dir);
+  const view = await docView(site.root, abs, entries);
   return shell(site, {
     title: view.title,
-    crumbs: crumbs(rel, taskName),
+    crumbs: crumbs(rel, readableName(dir, entries)),
     sidebar:
       `<section><h2>Files</h2><div id="files">${view.files}</div></section>` +
       `<section><h2>On this page</h2><div id="outline">${view.outline}</div></section>`,
@@ -586,14 +592,13 @@ async function serveFragment(site: Site, abs: string): Promise<Response> {
 
 function serveRaw(site: Site, abs: string): Response {
   if (statSync(abs).isDirectory()) return Response.redirect(`/view/${urlPath(relative(site.root, abs))}`, 302);
+  const file = Bun.file(abs);
   const headers: Record<string, string> = { "cache-control": "no-store", "x-content-type-options": "nosniff" };
-  // HTML artifacts run their own scripts. Sandboxing the document itself
-  // (not just the iframe) keeps them away from the viewer even when opened
-  // in their own tab.
-  if ([".html", ".htm", ".svg"].includes(extname(abs).toLowerCase())) {
-    headers["content-security-policy"] = `sandbox ${EMBED_SANDBOX}`;
-  }
-  return new Response(Bun.file(abs), { headers });
+  // HTML, SVG and other XML documents can run their own scripts. Sandboxing
+  // the document itself (not just the iframe) keeps them away from the viewer
+  // even when opened in their own tab.
+  if (/html|xml/.test(file.type)) headers["content-security-policy"] = `sandbox ${EMBED_SANDBOX}`;
+  return new Response(file, { headers });
 }
 
 if (import.meta.main) {
