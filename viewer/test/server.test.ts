@@ -17,7 +17,7 @@ import {
 import { connect } from "node:net";
 import { networkInterfaces, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { EMBED_SANDBOX } from "../render";
+import { EMBED_SANDBOX, escapeHtml } from "../render";
 import { startViewer, type Viewer, type ViewerOptions } from "../server";
 import { loadThemes, themeCss } from "../themes";
 import { freePort } from "./support";
@@ -554,7 +554,7 @@ describe("startViewer", () => {
     const other = startViewer({ root: empty, port: at, publicUrl: null, configDir: join(base, "no-config") });
     try {
       const body = await (await fetch(`http://127.0.0.1:${at}/`)).text();
-      expect(body).toContain(`<li>No documents under <code>${empty}</code>.</li>`);
+      expect(body).toContain(`<li>No documents under <code>${escapeHtml(empty)}</code>.</li>`);
       expect(body).not.toContain("theme-button");
       expect((await fetch(`http://127.0.0.1:${at}/`, { headers: { host: "box.example.ts.net" } })).status).toBe(421);
     } finally {

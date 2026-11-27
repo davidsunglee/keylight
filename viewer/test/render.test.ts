@@ -5,6 +5,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { EMBED_SANDBOX, renderMarkdown } from "../render";
 
 const base = realpathSync(mkdtempSync(join(tmpdir(), "keylight-render-")));
@@ -166,7 +167,7 @@ describe("renderMarkdown", () => {
       '<p><a href="/view/repo/task/other.md#part">o</a> <a href="/raw/repo/task/page.html">p</a> ' +
         '<a href="/raw/repo/task/notes.txt">n</a> <a href="/view/repo/task/my%20file.md">s</a></p>\n',
     );
-    expect(html(`[abs](${encodeURI(join(task, "other.md"))})`)).toBe(
+    expect(html(`[abs](${pathToFileURL(join(task, "other.md")).pathname})`)).toBe(
       '<p><a href="/view/repo/task/other.md">abs</a></p>\n',
     );
   });

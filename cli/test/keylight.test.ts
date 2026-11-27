@@ -135,7 +135,7 @@ describe.serial("the keylight executable", () => {
     );
     // Bun splits BUN_OPTIONS at whitespace and strips quote characters without
     // honoring them as quoting; only a backslash keeps a character literal.
-    const preload = slowServe.replace(/[^\w/.-]/g, "\\$&");
+    const preload = slowServe.replace(/[^\w/.-]/gu, "\\$&");
     const view = Bun.spawn([process.execPath, ENTRY, "view", "--no-open", "--port", String(port)], {
       env: { ...process.env, TMPDIR: repo.outside, BUN_OPTIONS: `--preload ${preload}` },
       stdio: ["ignore", "ignore", "ignore"],
