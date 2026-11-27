@@ -1,58 +1,104 @@
 #!/usr/bin/env bun
+// The artifact viewer: serves one artifact root over loopback HTTP.
 
-import { existsSync, readdirSync, realpathSync, statSync, watch, type FSWatcher } from "node:fs";
+import { existsSync, type FSWatcher, readdirSync, realpathSync, statSync, watch } from "node:fs";
 import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
-import { loadConfig, localUrl } from "../cli/config";
-import { EMBED_SANDBOX, IMAGE_EXT, escapeHtml, renderMarkdown, urlPath, type OutlineItem } from "./render";
-import { loadThemes, themeCss, type ThemeSet } from "./themes";
-
-const config = loadConfig(process.argv.slice(2));
-const { root } = config;
-if (!existsSync(root)) {
-  console.error(`Artifact root does not exist: ${root}`);
-  process.exit(1);
-}
+import type { Config } from "../cli/config";
+import { TaskError } from "../cli/task";
+import { EMBED_SANDBOX, escapeHtml, IMAGE_EXT, type OutlineItem, renderMarkdown, urlPath } from "./render";
+import { loadThemes, type ThemeSet, themeCss } from "./themes";
 
 const HERE = import.meta.dir;
 const PUBLIC_DIR = join(HERE, "public");
 const MERMAID_DIR = join(HERE, "..", "node_modules", "mermaid", "dist");
 
-const allowedHosts = new Set(["localhost", "127.0.0.1", "[::1]"]);
-if (config.publicUrl) allowedHosts.add(new URL(config.publicUrl).hostname);
-
 const PAGE_CSP =
   "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
   "img-src 'self' data: https:; font-src 'self' data:; frame-src 'self'; object-src 'none'; base-uri 'none'";
 
-const themeListeners = new Set<() => void>();
-let themeCache: ThemeSet | null = null;
-let themeWatchers: FSWatcher[] = [];
-let themeTimer: ReturnType<typeof setTimeout> | undefined;
-
-function onThemeChange() {
-  clearTimeout(themeTimer);
-  themeTimer = setTimeout(() => {
-    themeCache = null;
-    // Watch again from scratch, so a themes directory created later is seen.
-    for (const watcher of themeWatchers) watcher.close();
-    themeWatchers = [];
-    for (const notify of themeListeners) notify();
-  }, 150);
+export interface Viewer {
+  /** Ends open event streams and file watches, then stops listening. */
+  stop(): Promise<void>;
 }
 
-function themes(): ThemeSet {
-  if (!themeWatchers.length) {
-    for (const dir of [config.configDir, join(config.configDir, "themes")]) {
-      if (existsSync(dir)) themeWatchers.push(watch(dir, onThemeChange));
-    }
-  }
-  // Without a watcher (no config directory yet) nothing would refresh a cache.
-  if (!themeCache || !themeWatchers.length) themeCache = loadThemes(config.configDir);
-  return themeCache;
+interface Site {
+  root: string;
+  allowedHosts: Set<string>;
+  themes: WatchedThemes;
+  /** Ends each open event stream. */
+  streams: Set<() => void>;
 }
 
-function themePicker(): string {
-  const set = themes();
+interface WatchedThemes {
+  current(): ThemeSet;
+  /** Called after the config directory changes. */
+  listeners: Set<() => void>;
+  close(): void;
+}
+
+/** Serves `config.root` on loopback at `config.port` until stopped. */
+export function startViewer(config: Config): Viewer {
+  if (!existsSync(config.root)) throw new TaskError(`artifact root does not exist: ${config.root}`);
+  const allowedHosts = new Set(["localhost", "127.0.0.1", "[::1]"]);
+  if (config.publicUrl) allowedHosts.add(new URL(config.publicUrl).hostname);
+  const site: Site = { root: config.root, allowedHosts, themes: watchThemes(config.configDir), streams: new Set() };
+  const server = Bun.serve({
+    hostname: "127.0.0.1",
+    port: config.port,
+    idleTimeout: 0, // Event streams stay open.
+    fetch: (req) =>
+      handle(site, req).catch((err) => {
+        console.error(err);
+        return new Response("Internal error", { status: 500 });
+      }),
+  });
+  return {
+    async stop() {
+      for (const end of site.streams) end();
+      site.themes.close();
+      await server.stop(true);
+    },
+  };
+}
+
+function watchThemes(configDir: string): WatchedThemes {
+  const listeners = new Set<() => void>();
+  let cache: ThemeSet | null = null;
+  let watchers: FSWatcher[] = [];
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const unwatch = () => {
+    for (const watcher of watchers) watcher.close();
+    watchers = [];
+  };
+  const changed = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      cache = null;
+      // Watch again from scratch, so a themes directory created later is seen.
+      unwatch();
+      for (const notify of listeners) notify();
+    }, 150);
+  };
+  return {
+    listeners,
+    current() {
+      if (!watchers.length) {
+        for (const dir of [configDir, join(configDir, "themes")]) {
+          if (existsSync(dir)) watchers.push(watch(dir, changed));
+        }
+      }
+      // Without a watcher (no config directory yet) nothing would refresh a cache.
+      if (!cache || !watchers.length) cache = loadThemes(configDir);
+      return cache;
+    },
+    close() {
+      clearTimeout(timer);
+      unwatch();
+    },
+  };
+}
+
+function themePicker(set: ThemeSet): string {
   if (!set.themes.length) return "";
   const choice = (name: string, label: string, swatch: string, hint = "") =>
     `<button type="button" class="theme-choice" role="menuitemradio" aria-checked="false" data-theme-choice="${escapeHtml(name)}">` +
@@ -79,8 +125,8 @@ function themePicker(): string {
   );
 }
 
-/** Absolute path for a path inside the root, or null if it escapes or is missing. */
-function locate(rel: string, base = root): string | null {
+/** Absolute path for a path inside `base`, or null if it escapes or is missing. */
+function locate(base: string, rel: string): string | null {
   const abs = resolve(base, rel);
   if (abs !== base && !abs.startsWith(base + sep)) return null;
   if (!existsSync(abs)) return null;
@@ -97,16 +143,20 @@ interface Entry {
   kind: "doc" | "html" | "image" | "dir";
 }
 
+function isDocument(name: string): boolean {
+  return [".md", ".mdx"].includes(extname(name).toLowerCase());
+}
+
 function entryKind(name: string, isDir: boolean): Entry["kind"] | null {
   if (isDir) return "dir";
+  if (isDocument(name)) return "doc";
   const ext = extname(name).toLowerCase();
-  if (ext === ".md" || ext === ".mdx") return "doc";
   if (ext === ".html" || ext === ".htm") return "html";
   if (IMAGE_EXT.has(ext)) return "image";
   return null;
 }
 
-function listDir(dir: string): Entry[] {
+function listDir(root: string, dir: string): Entry[] {
   const out: Entry[] = [];
   for (const d of readdirSync(dir, { withFileTypes: true })) {
     if (d.name.startsWith(".") || d.name === "node_modules") continue;
@@ -155,30 +205,36 @@ interface Task {
 }
 
 /** Every directory (up to three levels deep) that directly holds documents. */
-function scanTasks(): Task[] {
+function scanTasks(root: string): Task[] {
   const tasks: Task[] = [];
   const walk = (dir: string, depth: number) => {
-    const entries = listDir(dir);
+    const entries = listDir(root, dir);
     const files = entries.filter((e) => e.kind !== "dir");
-    if (files.some((f) => f.kind === "doc") && dir !== root) {
-      const rel = relative(root, dir);
-      const dirName = basename(dir);
-      // Directories named by ID get a readable name from their first staged document.
-      const slug = files.map((f) => docKind(f.name)?.slug).find(Boolean);
-      const opaque = /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(dirName);
-      tasks.push({
-        rel,
-        name: opaque && slug ? slug : dirName,
-        group: dirname(rel) === "." ? "" : dirname(rel),
-        mtime: Math.max(...files.map((f) => f.mtime)),
-        files,
-      });
+    if (dir !== root && files.some((f) => f.kind === "doc")) {
+      tasks.push(taskAt(root, dir, files));
       return;
     }
     if (depth < 3) for (const e of entries) if (e.kind === "dir") walk(join(root, e.rel), depth + 1);
   };
   walk(root, 0);
   return tasks.sort((a, b) => b.mtime - a.mtime);
+}
+
+function taskAt(root: string, dir: string, files: Entry[]): Task {
+  const rel = relative(root, dir);
+  return {
+    rel,
+    name: readableName(dir, files) ?? basename(dir),
+    group: dirname(rel) === "." ? "" : dirname(rel),
+    mtime: Math.max(...files.map((f) => f.mtime)),
+    files,
+  };
+}
+
+/** Directories named by ID get a readable name from their first staged entry. */
+function readableName(dir: string, entries: Entry[]): string | undefined {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(basename(dir))) return undefined;
+  return entries.map((e) => docKind(e.name)?.slug).find(Boolean);
 }
 
 function ago(ms: number): string {
@@ -204,7 +260,10 @@ const SIDEBAR_RESIZER =
   '<div class="sidebar-resizer" id="sidebar-resizer" role="separator" aria-orientation="vertical" ' +
   'aria-label="Resize the sidebar" title="Drag to resize, double-click to reset" tabindex="0"></div>';
 
-function shell(opts: { title: string; crumbs: string; sidebar?: string; main: string; docPath?: string }): string {
+function shell(
+  site: Site,
+  opts: { title: string; crumbs: string; sidebar?: string; main: string; docPath?: string },
+): string {
   const hasSidebar = Boolean(opts.sidebar);
   return `<!doctype html>
 <html lang="en">
@@ -223,7 +282,7 @@ function shell(opts: { title: string; crumbs: string; sidebar?: string; main: st
   ${hasSidebar ? SIDEBAR_TOGGLE : ""}
   <nav class="crumbs" aria-label="Location">${opts.crumbs}</nav>
   <span class="live" id="live" hidden>live</span>
-  ${themePicker()}
+  ${themePicker(site.themes.current())}
 </header>
 ${hasSidebar ? `<aside class="sidebar" id="sidebar">${opts.sidebar}</aside>${SIDEBAR_RESIZER}<div class="scrim" id="scrim"></div>` : ""}
 <main class="main" id="main">${opts.main}</main>
@@ -243,8 +302,8 @@ function crumbs(rel: string, taskName?: string): string {
   return ['<a href="/" class="home">Artifacts</a>', ...links].join('<span class="sep">/</span>');
 }
 
-function fileList(dir: string, current?: string): string {
-  const items = listDir(dir)
+function fileList(root: string, dir: string, current?: string): string {
+  const items = listDir(root, dir)
     .filter((e) => e.kind !== "dir")
     .map((e) => {
       const stage = docKind(e.name);
@@ -296,23 +355,24 @@ interface DocView {
   version: string;
 }
 
-async function docView(abs: string): Promise<DocView> {
+async function docView(root: string, abs: string): Promise<DocView> {
   const stat = statSync(abs);
   const rendered = renderMarkdown(await Bun.file(abs).text(), abs, root);
   return {
     title: rendered.title,
     html: rendered.html,
-    files: fileList(dirname(abs), relative(root, abs)),
+    files: fileList(root, dirname(abs), relative(root, abs)),
     outline: outlineList(rendered.outline),
     version: `${stat.mtimeMs}-${stat.size}`,
   };
 }
 
-async function docPage(abs: string): Promise<string> {
-  const rel = relative(root, abs);
-  const view = await docView(abs);
-  const taskName = scanName(dirname(abs));
-  return shell({
+async function docPage(site: Site, abs: string): Promise<string> {
+  const rel = relative(site.root, abs);
+  const view = await docView(site.root, abs);
+  const dir = dirname(abs);
+  const taskName = readableName(dir, listDir(site.root, dir));
+  return shell(site, {
     title: view.title,
     crumbs: crumbs(rel, taskName),
     sidebar:
@@ -323,30 +383,23 @@ async function docPage(abs: string): Promise<string> {
   });
 }
 
-function scanName(dir: string): string | undefined {
-  const dirName = basename(dir);
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(dirName)) return undefined;
-  return listDir(dir)
-    .map((f) => docKind(f.name)?.slug)
-    .find(Boolean);
-}
-
-function dirPage(abs: string): string {
-  const rel = relative(root, abs);
-  const rows = listDir(abs).map(
+function dirPage(site: Site, abs: string): string {
+  const rel = relative(site.root, abs);
+  const entries = listDir(site.root, abs);
+  const rows = entries.map(
     (e) =>
       `<li><a href="${entryHref(e)}"><span class="label">${escapeHtml(e.name)}${e.kind === "dir" ? "/" : ""}</span>` +
       `<span class="when">${ago(e.mtime)}</span></a></li>`,
   );
-  return shell({
+  return shell(site, {
     title: basename(abs),
     crumbs: crumbs(rel),
-    main: `<div class="listing"><h1>${escapeHtml(scanName(abs) ?? basename(abs))}</h1><ul class="rows">${rows.join("") || "<li>No documents here.</li>"}</ul></div>`,
+    main: `<div class="listing"><h1>${escapeHtml(readableName(abs, entries) ?? basename(abs))}</h1><ul class="rows">${rows.join("") || "<li>No documents here.</li>"}</ul></div>`,
   });
 }
 
-function indexPage(): string {
-  const tasks = scanTasks();
+function indexPage(site: Site): string {
+  const tasks = scanTasks(site.root);
   const cards = tasks.map((t) => {
     const staged = t.files
       .map((f) => ({ f, stage: docKind(f.name) }))
@@ -365,13 +418,13 @@ function indexPage(): string {
       `<div class="chips">${chips.join("")}${other > 0 ? `<a class="chip more" href="/view/${urlPath(t.rel)}">+${other}</a>` : ""}</div></li>`
     );
   });
-  return shell({
+  return shell(site, {
     title: "Artifacts",
     crumbs: '<span class="here home">Artifacts</span>',
     main:
       `<div class="listing"><h1>Tasks</h1>` +
       `<input id="filter" class="filter" type="search" placeholder="Filter ${tasks.length} tasks" autocomplete="off">` +
-      `<ul class="tasks" id="tasks">${cards.join("") || `<li>No documents under <code>${escapeHtml(root)}</code>.</li>`}</ul></div>`,
+      `<ul class="tasks" id="tasks">${cards.join("") || `<li>No documents under <code>${escapeHtml(site.root)}</code>.</li>`}</ul></div>`,
   });
 }
 
@@ -387,9 +440,9 @@ function html(body: string, status = 200): Response {
   });
 }
 
-function notFound(what: string): Response {
+function notFound(site: Site, what: string): Response {
   return html(
-    shell({
+    shell(site, {
       title: "Not found",
       crumbs: crumbs(""),
       main: `<div class="listing"><h1>Not found</h1><p><code>${escapeHtml(what)}</code> is not under the artifact root.</p></div>`,
@@ -407,16 +460,16 @@ function decodePath(pathname: string, prefix: string): string | null {
 }
 
 /** Event stream: theme changes for every page, plus file changes in `dir` for documents. */
-function events(dir: string | null, signal: AbortSignal): Response {
+function events(site: Site, dir: string | null, signal: AbortSignal): Response {
   const encoder = new TextEncoder();
-  let cleanup = () => {};
+  let end = () => {};
   const stream = new ReadableStream({
     start(controller) {
       const send = (text: string) => {
         try {
           controller.enqueue(encoder.encode(text));
         } catch {
-          cleanup();
+          end();
         }
       };
       let timer: ReturnType<typeof setTimeout> | undefined;
@@ -429,19 +482,26 @@ function events(dir: string | null, signal: AbortSignal): Response {
           })
         : null;
       const onTheme = () => send("event: theme\ndata: {}\n\n");
-      themeListeners.add(onTheme);
+      site.themes.listeners.add(onTheme);
       const beat = setInterval(() => send(": keepalive\n\n"), 20_000);
-      cleanup = () => {
+      end = () => {
         clearTimeout(timer);
         clearInterval(beat);
-        themeListeners.delete(onTheme);
+        site.themes.listeners.delete(onTheme);
         watcher?.close();
+        site.streams.delete(end);
+        try {
+          controller.close();
+        } catch {
+          // The client already closed it.
+        }
       };
-      signal.addEventListener("abort", cleanup);
+      site.streams.add(end);
+      signal.addEventListener("abort", end);
       send("retry: 1000\n\n");
     },
     cancel() {
-      cleanup();
+      end();
     },
   });
   return new Response(stream, {
@@ -449,87 +509,97 @@ function events(dir: string | null, signal: AbortSignal): Response {
   });
 }
 
-async function handle(req: Request): Promise<Response> {
-  const url = new URL(req.url);
+type RouteHandler = (site: Site, req: Request, url: URL) => Response | Promise<Response>;
+type Route = ({ path: string } | { prefix: string }) & { serve: RouteHandler };
+
+// The first matching route serves the request.
+const ROUTES: Route[] = [
+  { path: "/", serve: (site) => html(indexPage(site)) },
+  { path: "/__ping", serve: (site) => Response.json({ app: "keylight-viewer", root: site.root, pid: process.pid }) },
+  // Generated, so it comes before the files under /assets/.
+  { path: "/assets/theme.css", serve: serveThemeCss },
+  { prefix: "/assets/", serve: serveAsset },
+  { path: "/events", serve: serveEvents },
+  artifactRoute("/view/", serveView),
+  artifactRoute("/frag/", serveFragment),
+  artifactRoute("/raw/", serveRaw),
+];
+
+async function handle(site: Site, req: Request): Promise<Response> {
   // Reject requests addressed to a name we don't serve (DNS rebinding).
   const host = (req.headers.get("host") ?? "").replace(/:\d+$/, "");
-  if (!allowedHosts.has(host)) return new Response("Unknown host", { status: 421 });
+  if (!site.allowedHosts.has(host)) return new Response("Unknown host", { status: 421 });
   if (req.method !== "GET" && req.method !== "HEAD") return new Response("Method not allowed", { status: 405 });
-
+  const url = new URL(req.url);
   const path = url.pathname;
-  if (path === "/") return html(indexPage());
-  if (path === "/__ping") return Response.json({ app: "keylight-viewer", root, pid: process.pid });
-
-  if (path === "/assets/theme.css") {
-    return new Response(themeCss(themes()), {
-      headers: { "content-type": "text/css; charset=utf-8", "cache-control": "no-store" },
-    });
-  }
-
-  if (path.startsWith("/assets/")) {
-    const rel = decodePath(path, "/assets/");
-    if (rel === null) return new Response("Bad path", { status: 400 });
-    const fromMermaid = rel.startsWith("mermaid/");
-    const abs = fromMermaid ? locate(rel.slice("mermaid/".length), MERMAID_DIR) : locate(rel, PUBLIC_DIR);
-    if (!abs || statSync(abs).isDirectory()) return new Response("Not found", { status: 404 });
-    return new Response(Bun.file(abs), {
-      headers: { "cache-control": fromMermaid ? "public, max-age=604800" : "no-cache" },
-    });
-  }
-
-  if (path === "/events") {
-    const watched = url.searchParams.get("path");
-    if (watched === null) return events(null, req.signal);
-    const abs = locate(watched);
-    if (!abs) return new Response("Not found", { status: 404 });
-    return events(statSync(abs).isDirectory() ? abs : dirname(abs), req.signal);
-  }
-
-  for (const prefix of ["/view/", "/frag/", "/raw/"] as const) {
-    if (!path.startsWith(prefix)) continue;
-    const rel = decodePath(path, prefix);
-    const abs = rel === null ? null : locate(rel);
-    if (!abs) return notFound(rel ?? path);
-    const isDir = statSync(abs).isDirectory();
-    const isDoc = [".md", ".mdx"].includes(extname(abs).toLowerCase());
-
-    if (prefix === "/frag/") {
-      if (!isDoc) return new Response("Not a document", { status: 400 });
-      return Response.json(await docView(abs), { headers: { "cache-control": "no-store" } });
-    }
-    if (prefix === "/view/") {
-      if (isDir) return html(dirPage(abs));
-      if (isDoc) return html(await docPage(abs));
-      return Response.redirect(`/raw/${urlPath(relative(root, abs))}`, 302);
-    }
-    if (isDir) return Response.redirect(`/view/${urlPath(relative(root, abs))}`, 302);
-    const headers: Record<string, string> = { "cache-control": "no-store", "x-content-type-options": "nosniff" };
-    // HTML artifacts run their own scripts. Sandboxing the document itself
-    // (not just the iframe) keeps them away from the viewer even when opened
-    // in their own tab.
-    if ([".html", ".htm", ".svg"].includes(extname(abs).toLowerCase())) {
-      headers["content-security-policy"] = `sandbox ${EMBED_SANDBOX}`;
-    }
-    return new Response(Bun.file(abs), { headers });
-  }
-
-  return notFound(path);
+  const route = ROUTES.find((r) => ("path" in r ? path === r.path : path.startsWith(r.prefix)));
+  return route ? route.serve(site, req, url) : notFound(site, path);
 }
 
-const server = Bun.serve({
-  hostname: "127.0.0.1",
-  port: config.port,
-  idleTimeout: 0, // Event streams stay open.
-  fetch: (req) =>
-    handle(req).catch((err) => {
-      console.error(err);
-      return new Response("Internal error", { status: 500 });
-    }),
-});
+function serveThemeCss(site: Site): Response {
+  return new Response(themeCss(site.themes.current()), {
+    headers: { "content-type": "text/css; charset=utf-8", "cache-control": "no-store" },
+  });
+}
 
-console.log(`keylight viewer: ${localUrl(config)}  (root: ${root})`);
-if (config.publicUrl) console.log(`public links: ${config.publicUrl}`);
-process.on("SIGTERM", () => {
-  server.stop(true);
-  process.exit(0);
-});
+function serveAsset(_site: Site, _req: Request, url: URL): Response {
+  const rel = decodePath(url.pathname, "/assets/");
+  if (rel === null) return new Response("Bad path", { status: 400 });
+  const fromMermaid = rel.startsWith("mermaid/");
+  const abs = fromMermaid ? locate(MERMAID_DIR, rel.slice("mermaid/".length)) : locate(PUBLIC_DIR, rel);
+  if (!abs || statSync(abs).isDirectory()) return new Response("Not found", { status: 404 });
+  return new Response(Bun.file(abs), {
+    headers: { "cache-control": fromMermaid ? "public, max-age=604800" : "no-cache" },
+  });
+}
+
+function serveEvents(site: Site, req: Request, url: URL): Response {
+  const watched = url.searchParams.get("path");
+  if (watched === null) return events(site, null, req.signal);
+  const abs = locate(site.root, watched);
+  if (!abs) return new Response("Not found", { status: 404 });
+  return events(site, statSync(abs).isDirectory() ? abs : dirname(abs), req.signal);
+}
+
+/** A route for the file or directory named by the path after `prefix`, when it is inside the root. */
+function artifactRoute(prefix: string, serve: (site: Site, abs: string) => Response | Promise<Response>): Route {
+  return {
+    prefix,
+    serve: (site, _req, url) => {
+      const rel = decodePath(url.pathname, prefix);
+      const abs = rel === null ? null : locate(site.root, rel);
+      return abs ? serve(site, abs) : notFound(site, rel ?? url.pathname);
+    },
+  };
+}
+
+async function serveView(site: Site, abs: string): Promise<Response> {
+  if (statSync(abs).isDirectory()) return html(dirPage(site, abs));
+  if (isDocument(abs)) return html(await docPage(site, abs));
+  return Response.redirect(`/raw/${urlPath(relative(site.root, abs))}`, 302);
+}
+
+async function serveFragment(site: Site, abs: string): Promise<Response> {
+  if (!isDocument(abs)) return new Response("Not a document", { status: 400 });
+  return Response.json(await docView(site.root, abs), { headers: { "cache-control": "no-store" } });
+}
+
+function serveRaw(site: Site, abs: string): Response {
+  if (statSync(abs).isDirectory()) return Response.redirect(`/view/${urlPath(relative(site.root, abs))}`, 302);
+  const headers: Record<string, string> = { "cache-control": "no-store", "x-content-type-options": "nosniff" };
+  // HTML artifacts run their own scripts. Sandboxing the document itself
+  // (not just the iframe) keeps them away from the viewer even when opened
+  // in their own tab.
+  if ([".html", ".htm", ".svg"].includes(extname(abs).toLowerCase())) {
+    headers["content-security-policy"] = `sandbox ${EMBED_SANDBOX}`;
+  }
+  return new Response(Bun.file(abs), { headers });
+}
+
+if (import.meta.main) {
+  // ensureServer starts a detached viewer by running this file, which serves as `keylight serve` does. Imported
+  // here, not at the top, because cli/commands imports this module.
+  void import("../cli/commands").then(async ({ runCommand }) => {
+    process.exitCode = await runCommand(["serve", ...process.argv.slice(2)]);
+  });
+}

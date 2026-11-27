@@ -1,12 +1,13 @@
 // Every keylight command, by name. runCommand parses the arguments, finds the
 // command's handler, and turns a TaskError or ConfigError into
 // `keylight: <message>` on stderr and exit status 1. Handlers return their exit
-// status; only the entry ends the process, apart from the viewer `serve` loads.
+// status; only the entry ends the process, apart from `serve` on SIGTERM.
 
 import { closeSync, existsSync, mkdirSync, openSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative, resolve, sep } from "node:path";
 import { urlPath } from "../viewer/render";
+import { startViewer } from "../viewer/server";
 import { type Config, flag, loadConfig, localUrl } from "./config";
 import { gatePrompt, initState, printStatus, type RunOptions, readState, recordWorktree, runWorkflow } from "./run";
 import { nextLine } from "./say";
@@ -73,7 +74,7 @@ const COMMANDS: Record<string, Handler> = {
   url: (invocation) => showLink(invocation, false),
 };
 
-/** Runs `keylight <argv>` and returns its exit status. `serve` reads the process's own arguments instead and may end the process. */
+/** Runs `keylight <argv>` and returns its exit status. `serve` returns while its viewer goes on listening. */
 export async function runCommand(argv: string[]): Promise<number> {
   const invocation = parseInvocation(argv);
   const handler = Object.hasOwn(COMMANDS, invocation.command) ? COMMANDS[invocation.command] : undefined;
@@ -205,10 +206,14 @@ async function scratch({ config, argv, named }: Invocation): Promise<number> {
   return 0;
 }
 
-async function serve(): Promise<number> {
-  // The viewer reads its settings from the process's arguments, keeps the process alive while it listens, and ends
-  // the process itself on a missing root or SIGTERM.
-  await import("../viewer/server");
+function serve({ config }: Invocation): number {
+  const viewer = startViewer(config);
+  console.log(`keylight viewer: ${localUrl(config)}  (root: ${config.root})`);
+  if (config.publicUrl) console.log(`public links: ${config.publicUrl}`);
+  process.on("SIGTERM", () => {
+    void viewer.stop();
+    process.exit(0);
+  });
   return 0;
 }
 

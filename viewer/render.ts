@@ -8,6 +8,7 @@ import { basename, dirname, extname, relative, resolve, sep } from "node:path";
 import hljs from "highlight.js";
 import MarkdownIt from "markdown-it";
 import type { RenderRule } from "markdown-it/lib/renderer.mjs";
+import type StateCore from "markdown-it/lib/rules_core/state_core.mjs";
 import type Token from "markdown-it/lib/token.mjs";
 
 export interface OutlineItem {
@@ -46,6 +47,7 @@ const LANG_ALIAS: Record<string, string> = {
   zsh: "bash",
 };
 const PLAIN_LANGS = new Set(["", "text", "txt", "plain", "plaintext"]);
+const URL_SCHEME = /^[a-z][a-z0-9+.-]*:/i;
 
 // Raw HTML is allowed only for these tags. Agent prose is full of things like
 // `Stream<T>` and `<task-slug>`; passing unknown tags through would make that
@@ -89,7 +91,7 @@ function resolveRef(ref: string, env: Env): string | null {
   return null;
 }
 
-function slugify(text: string, slugs: Map<string, number>): string {
+function headingId(text: string, slugs: Map<string, number>): string {
   const base =
     text
       .toLowerCase()
@@ -194,7 +196,7 @@ function createMarkdown(): MarkdownIt {
       .filter((t) => t.type === "text" || t.type === "code_inline")
       .map((t) => t.content)
       .join("");
-    const id = slugify(text, env.slugs);
+    const id = headingId(text, env.slugs);
     tokens[idx]!.attrSet("id", id);
     const foldable = Boolean(tokens[idx]!.meta?.foldable);
     env.outline.push({ level: Number(tokens[idx]!.tag.slice(1)), text, id, foldable });
@@ -208,16 +210,12 @@ function createMarkdown(): MarkdownIt {
   md.renderer.rules.link_open = (tokens, idx, options, env: Env, self) => {
     const token = tokens[idx]!;
     const href = token.attrGet("href") ?? "";
-    if (/^[a-z][a-z0-9+.-]*:/i.test(href)) {
+    if (URL_SCHEME.test(href)) {
       token.attrSet("target", "_blank");
       token.attrSet("rel", "noopener");
     } else if (!href.startsWith("#")) {
-      const [path = "", fragment] = href.split("#");
-      const rel = resolveRef(path, env);
-      if (rel) {
-        const prefix = extname(rel).toLowerCase() === ".md" ? "/view/" : "/raw/";
-        token.attrSet("href", prefix + urlPath(rel) + (fragment ? `#${fragment}` : ""));
-      }
+      const local = viewerHref(href, env);
+      if (local) token.attrSet("href", local);
     }
     return linkOpen(tokens, idx, options, env, self);
   };
@@ -226,7 +224,7 @@ function createMarkdown(): MarkdownIt {
   md.renderer.rules.image = (tokens, idx, options, env: Env, self) => {
     const token = tokens[idx]!;
     const src = token.attrGet("src") ?? "";
-    if (!/^[a-z][a-z0-9+.-]*:/i.test(src)) {
+    if (!URL_SCHEME.test(src)) {
       const rel = resolveRef(src, env);
       if (rel) token.attrSet("src", `/raw/${urlPath(rel)}`);
     }
@@ -237,24 +235,9 @@ function createMarkdown(): MarkdownIt {
   md.core.ruler.after("inline", "task-lists", (state) => {
     const tokens = state.tokens;
     for (let i = 2; i < tokens.length; i++) {
-      const inline = tokens[i]!;
-      if (
-        inline.type !== "inline" ||
-        tokens[i - 1]!.type !== "paragraph_open" ||
-        tokens[i - 2]!.type !== "list_item_open"
-      ) {
-        continue;
-      }
-      const first = inline.children?.[0];
-      const match = first?.type === "text" ? /^\[([ xX])\]\s+/.exec(first.content) : null;
-      if (!first || !match) continue;
-      first.content = first.content.slice(match[0].length);
-      const checked = match[1] !== " ";
-      const box = new state.Token("html_inline", "", 0) as Token;
-      box.content = `<input type="checkbox" disabled${checked ? " checked" : ""}> `;
-      // Marked trusted so the sanitizer's tag list doesn't need to include input.
-      box.meta = { trusted: true };
-      inline.children!.unshift(box);
+      const checked = takeTaskMarker(tokens, i);
+      if (checked === null) continue;
+      tokens[i]!.children!.unshift(checkbox(state, checked));
       tokens[i - 2]!.attrJoin("class", checked ? "task done" : "task");
     }
   });
@@ -303,6 +286,44 @@ function createMarkdown(): MarkdownIt {
   return md;
 }
 
+/** Where the viewer serves a link's local target, or null when the target is missing or outside the root. */
+function viewerHref(href: string, env: Env): string | null {
+  const [path = "", fragment] = href.split("#");
+  const rel = resolveRef(path, env);
+  if (!rel) return null;
+  const prefix = extname(rel).toLowerCase() === ".md" ? "/view/" : "/raw/";
+  return prefix + urlPath(rel) + (fragment ? `#${fragment}` : "");
+}
+
+/**
+ * Whether the list item whose first paragraph is the inline token at `i`
+ * starts with a checked or unchecked box, removing the box's text; null when
+ * it is not a task item.
+ */
+function takeTaskMarker(tokens: Token[], i: number): boolean | null {
+  const inline = tokens[i]!;
+  if (
+    inline.type !== "inline" ||
+    tokens[i - 1]!.type !== "paragraph_open" ||
+    tokens[i - 2]!.type !== "list_item_open"
+  ) {
+    return null;
+  }
+  const first = inline.children?.[0];
+  const match = first?.type === "text" ? /^\[([ xX])\]\s+/.exec(first.content) : null;
+  if (!first || !match) return null;
+  first.content = first.content.slice(match[0].length);
+  return match[1] !== " ";
+}
+
+function checkbox(state: StateCore, checked: boolean): Token {
+  const box = new state.Token("html_inline", "", 0);
+  box.content = `<input type="checkbox" disabled${checked ? " checked" : ""}> `;
+  // Marked trusted so the sanitizer's tag list doesn't need to include input.
+  box.meta = { trusted: true };
+  return box;
+}
+
 const md = createMarkdown();
 
 function renderFrontmatter(data: Record<string, unknown>): string {
@@ -318,7 +339,7 @@ function renderFrontmatter(data: Record<string, unknown>): string {
   return `<details class="frontmatter"><summary>${summary || "Frontmatter"}</summary><table>${rows}</table></details>\n`;
 }
 
-export function splitFrontmatter(source: string): { data: Record<string, unknown> | null; body: string } {
+function splitFrontmatter(source: string): { data: Record<string, unknown> | null; body: string } {
   const match = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/.exec(source);
   if (!match) return { data: null, body: source };
   try {

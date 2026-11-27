@@ -16,7 +16,7 @@ import { join, relative } from "node:path";
 import MarkdownIt from "markdown-it";
 import { devices, webkit } from "playwright";
 import { flag, loadConfig } from "../../cli/config";
-import { splitFrontmatter, urlPath } from "../render";
+import { urlPath } from "../render";
 
 const argv = process.argv.slice(2);
 const config = loadConfig(argv);
@@ -36,12 +36,25 @@ function findDocs(dir: string, out: string[] = []): string[] {
   return out;
 }
 
+/** The source after its frontmatter: a leading YAML mapping between `---` lines, which the viewer does not render as Markdown. */
+function withoutFrontmatter(source: string): string {
+  const match = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/.exec(source);
+  if (!match) return source;
+  try {
+    const data = Bun.YAML.parse(match[1] ?? "");
+    if (data && typeof data === "object" && !Array.isArray(data)) return source.slice(match[0].length);
+  } catch {
+    // Not YAML, so the viewer renders the block as Markdown.
+  }
+  return source;
+}
+
 // Counted with plain markdown-it rather than the viewer's renderer, so a fence
 // the viewer stops turning into a diagram shows up as a missing one.
 const parser = new MarkdownIt({ html: true });
 function mermaidFences(file: string): number {
   return parser
-    .parse(splitFrontmatter(readFileSync(file, "utf8")).body, {})
+    .parse(withoutFrontmatter(readFileSync(file, "utf8")), {})
     .filter((t) => t.type === "fence" && t.info.trim().split(/\s+/)[0]?.toLowerCase() === "mermaid").length;
 }
 
