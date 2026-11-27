@@ -18,7 +18,7 @@
     "gate:dead-code-production": "bunx --bun knip --production",
     "gate:file-size": "bun checks/file-size.ts",
     "check:browser": "bun viewer/test/check-browser.ts",
-    "check:audit": "bun audit --ignore=GHSA-238p-pmpm-9mq7",
+    "check:audit": "bun audit",
     "check:commits": "bun checks/commit-subjects.ts",
     "check:harness": "bun cli/test/check-harness.ts",
     "serve": "bun cli/keylight.ts serve",
@@ -28,7 +28,7 @@
   "dependencies": {
     "highlight.js": "11",
     "markdown-it": "14",
-    "mermaid": "11"
+    "mermaid": "12"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.9",

@@ -344,9 +344,7 @@ can bypass. Before pushing, run the ones a change touches:
 | `bun run check:harness` | Every flag keylight passes Claude Code and Codex is in their `--help` | `claude` and `codex` installed |
 
 `check:harness` also runs weekly, since a CLI release can drop a flag without a
-change here. `check:audit` ignores GHSA-238p-pmpm-9mq7, a low-severity KaTeX
-advisory inside Mermaid 11's bundle: only Mermaid 12 fixes it, and it changes
-every diagram's layout and colors.
+change here.
 
 No job shows what a model does inside a step. Verify a skill or runner change
 by running it in a real session in a scratch repository.
