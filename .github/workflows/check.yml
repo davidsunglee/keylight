@@ -1,0 +1,66 @@
+# Each job runs one of the package.json check scripts, the same command a
+# developer runs locally. The weekly run is for the harness job alone: Claude
+# Code and Codex can drop a flag without any change here.
+
+name: check
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+      - run: bun ci
+      - run: bun run check
+
+  browser:
+    if: github.event_name != 'schedule'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+      - run: bun ci
+      - run: bunx playwright install webkit
+      - run: bun run check:browser
+
+  audit:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+      - run: bun run check:audit
+
+  commits:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      # The pull request's own head, not GitHub's test merge, so the range holds the branch's commits.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+      - run: bun run check:commits "$BASE"
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+
+  harness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+      - run: bun ci
+      - run: npm install --global @anthropic-ai/claude-code@latest @openai/codex@latest
+      - run: bun run check:harness

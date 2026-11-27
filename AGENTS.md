@@ -23,8 +23,12 @@ Design principles are in [`CODING_STANDARDS.md`](CODING_STANDARDS.md).
 
 ## Verification
 
+A pull request merges into `main` only when GitHub's five jobs pass, each running one script: `bun run check`, `check:browser`, `check:audit`, `check:commits` and `check:harness`. Run the ones a change touches before pushing:
+
 - `bun run check` must pass.
 - Verify a viewer change with `bun run check:browser`, which checks desktop and phone width.
+- Verify a change to the flags keylight passes Claude Code or Codex with `bun run check:harness`.
+- Run `bun run check:commits` before pushing a branch; it checks each subject the branch adds to `origin/main`.
 - Verify a skill or runner change by running it in a real session in a scratch repository. Reading the skill is not verification.
 - Launch test sessions on cheaper models at medium effort: `opus` or `sonnet` in Claude Code, `gpt-6.2-sol` or `gpt-6.1-terra` in Codex.
 

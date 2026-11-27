@@ -212,6 +212,8 @@ registered with Claude Code or Codex, and the same brief works in both.
 ### Install
 
 ```sh
+git clone https://github.com/davidsunglee/keylight.git
+cd keylight
 bun install
 
 # The command: a wrapper in any directory on PATH.
@@ -227,7 +229,10 @@ codex plugin marketplace add "$PWD"
 codex plugin add kl@keylight
 ```
 
-Codex installs a copy of `plugin/`. After changing a skill, refresh the copy:
+Update with `git pull` in the checkout, then `bun install` if `bun.lock`
+changed. The wrapper and the Claude Code link run from the checkout, so the
+next command and session use the update. Codex installs a copy of `plugin/`.
+After a pull or a skill change, refresh the copy:
 
 ```sh
 codex plugin remove kl@keylight && codex plugin add kl@keylight
@@ -321,7 +326,30 @@ export KEYLIGHT_PUBLIC_URL=https://<machine>.<tailnet>.ts.net
 - Raw HTML in Markdown is limited to a list of formatting tags. Anything else
   is shown as text, so `Stream<T>` in prose stays visible.
 
-### Checking a change
+## Checking a change
+
+GitHub runs five jobs on every pull request and every push to `main`, each one
+`bun run` script. `main` takes a change only through a pull request whose five
+jobs pass, merged by rebase so its commit subjects land as checked; the owner
+can bypass. Run the same scripts locally before pushing:
+
+| Script | Checks | Needs |
+| --- | --- | --- |
+| `bun run check` | Types, Biome format and lint (complexity included), tests with per-file coverage, duplication, dead code, file sizes | The checkout, offline |
+| `bun run check:browser` | The viewer's render check at desktop and phone width | WebKit (below) |
+| `bun run check:audit` | No locked dependency has a known advisory | The network |
+| `bun run check:commits [base]` | Each commit subject in `<base>..HEAD` is `type(scope): subject`; the base defaults to `origin/main` | The branch's history |
+| `bun run check:harness` | Every flag keylight passes Claude Code and Codex is in their `--help` | `claude` and `codex` installed |
+
+`check:harness` also runs weekly, since a CLI release can drop a flag without a
+change here. `check:audit` ignores GHSA-238p-pmpm-9mq7, a low-severity KaTeX
+advisory inside Mermaid 11's bundle: only Mermaid 12 fixes it, and it changes
+every diagram's layout and colors.
+
+No job shows what a model does inside a step. Verify a skill or runner change
+by running it in a real session in a scratch repository.
+
+### The viewer in a browser
 
 These tools drive headless WebKit, the engine behind Safari on Mac and iPhone
 (`bunx playwright install webkit` once). The fixtures in `viewer/test/fixtures/`
