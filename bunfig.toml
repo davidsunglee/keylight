@@ -14,3 +14,8 @@ coveragePathIgnorePatterns = [
   "**/test/**",
   "checks/**",
 ]
+
+[run]
+# The gate tools start with `#!/usr/bin/env node`; running them on Bun keeps an
+# older Node on PATH, which knip and others reject, from breaking the gates.
+bun = true

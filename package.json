@@ -12,7 +12,7 @@
     "check": "bun run --parallel --no-exit-on-error 'gate:*'",
     "gate:types": "tsc -p .",
     "gate:lint": "biome ci --error-on-warnings",
-    "gate:tests": "bun test --coverage || (echo 'bun test failed: a test failed, or a file in the coverage table is under the coverageThreshold in bunfig.toml' >&2 && exit 1)",
+    "gate:tests": "sh -c 'bun test --coverage \"$@\" || { echo \"bun test failed: a test failed, or a file in the coverage table is under the coverageThreshold in bunfig.toml\" >&2; exit 1; }' gate:tests",
     "gate:duplication": "jscpd",
     "gate:dead-code": "knip --no-config-hints",
     "gate:dead-code-production": "knip --production",
