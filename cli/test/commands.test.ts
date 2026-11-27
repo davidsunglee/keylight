@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { freePort } from "../../viewer/test/support";
 import { runCommand } from "../commands";
@@ -82,18 +83,19 @@ describe.serial("start and status", () => {
 
   test("start takes the workflow and profile flags and refuses a task that already has a workflow", async () => {
     using repo = tempRepo();
+    writeFileSync(join(repo.configDir, "workflows.yaml"), 'profiles:\n  fast:\n    "*": { harness: codex }\n');
     const created = await keylight(
       "start",
       "Plan",
       "--workflow",
       "direct",
       "--profile",
-      "default",
+      "fast",
       "--name=plan",
       "--no-run",
     );
     expect(created.stdout).toBe("Created task plan (direct workflow).\n");
-    expect(readJson(join(repo.store("plan"), ".keylight.json")).workflow).toBe("direct");
+    expect(readJson(join(repo.store("plan"), ".keylight.json"))).toMatchObject({ workflow: "direct", profile: "fast" });
 
     expect(await keylight("start", "Again", "--name", "plan", "--no-run")).toEqual({
       code: 1,
@@ -360,6 +362,7 @@ describe.serial("the viewer commands", () => {
       const ping = await (await fetch(`http://127.0.0.1:${port}/__ping`)).json();
       expect(ping).toMatchObject({ app: "keylight-viewer", root: repo.root });
     } finally {
+      rmSync(join(tmpdir(), `keylight-viewer-${port}.log`), { force: true });
       expect((await keylight("stop", "--port", port)).stdout).toBe(`Stopped the viewer for ${repo.root}.\n`);
     }
   });

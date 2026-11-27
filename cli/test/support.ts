@@ -9,7 +9,7 @@ import { format } from "node:util";
 import type { Subprocess } from "bun";
 import { runCommand } from "../commands";
 import { ensureTask } from "../task";
-import { removeAfterRun, resetTerminal, terminal } from "./preload";
+import { removeAfterRun, terminal } from "./preload";
 
 export const ENTRY = join(import.meta.dir, "..", "keylight.ts");
 
@@ -42,11 +42,12 @@ export function scopedEnv(vars: Record<string, string | undefined>): Disposable 
   return { [Symbol.dispose]: () => apply(saved) };
 }
 
-/** A git command for building fixtures, kept away from the developer's own git settings. */
+/** A git command for building fixtures, reading no git settings or overrides from the developer's environment. */
 export function git(cwd: string, ...args: string[]): string {
+  const inherited = Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_") && key !== "XDG_CONFIG_HOME");
   const result = Bun.spawnSync(["git", ...args], {
     cwd,
-    env: { ...process.env, HOME: cwd, GIT_CONFIG_NOSYSTEM: "1" },
+    env: { ...Object.fromEntries(inherited), HOME: cwd, GIT_CONFIG_NOSYSTEM: "1" },
     stdout: "pipe",
     stderr: "pipe",
   });
@@ -62,6 +63,8 @@ function copyRepository(to: string) {
     const dir = makeTempDir();
     removeAfterRun.push(dir);
     git(dir, "init", "-q", "-b", "main");
+    // The git commands under test read the developer's global settings; this keeps their hooks out of fixtures.
+    git(dir, "config", "core.hooksPath", "/dev/null");
     git(
       dir,
       "-c",
@@ -172,16 +175,30 @@ export function tempRepo(options: { tasks?: string[] } = {}): TempRepo {
 
 /** Every stream reports a terminal, and each question takes the next of `answers`. */
 export function atTerminal(answers: (string | null)[] = []): Disposable & { questions: string[] } {
-  for (const stream of [process.stdin, process.stdout, process.stderr]) Object.assign(stream, { isTTY: true });
+  const streams = [process.stdin, process.stdout, process.stderr];
+  const saved = {
+    isTTY: streams.map((stream) => stream.isTTY),
+    answers: terminal.answers,
+    questions: terminal.questions,
+  };
+  for (const stream of streams) Object.assign(stream, { isTTY: true });
   terminal.answers = [...answers];
   terminal.questions = [];
-  return { questions: terminal.questions, [Symbol.dispose]: resetTerminal };
+  return {
+    questions: terminal.questions,
+    [Symbol.dispose]: () => {
+      for (const [i, stream] of streams.entries()) Object.assign(stream, { isTTY: saved.isTTY[i] });
+      terminal.answers = saved.answers;
+      terminal.questions = saved.questions;
+    },
+  };
 }
 
 /** Standard input holds `text` and then ends, as when a command is piped into. */
 export function pipedStdin(text: string): Disposable {
+  const saved = Bun.stdin;
   Object.assign(Bun, { stdin: new Blob([text]) });
-  return { [Symbol.dispose]: resetTerminal };
+  return { [Symbol.dispose]: () => Object.assign(Bun, { stdin: saved }) };
 }
 
 /** Runs `action` with console and stream output captured instead of printed. */

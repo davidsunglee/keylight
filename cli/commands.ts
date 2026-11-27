@@ -1,9 +1,9 @@
 // Every keylight command, by name. runCommand parses the arguments, finds the
-// command's handler, and turns a TaskError or ConfigError into one line on
-// stderr and exit status 1. Handlers return their exit status; only the entry
-// ends the process.
+// command's handler, and turns a TaskError or ConfigError into
+// `keylight: <message>` on stderr and exit status 1. Handlers return their exit
+// status; only the entry ends the process, apart from the viewer `serve` loads.
 
-import { existsSync, mkdirSync, openSync, realpathSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative, resolve, sep } from "node:path";
 import { urlPath } from "../viewer/render";
@@ -73,7 +73,7 @@ const COMMANDS: Record<string, Handler> = {
   url: (invocation) => showLink(invocation, false),
 };
 
-/** Runs `keylight <argv>` and returns its exit status. */
+/** Runs `keylight <argv>` and returns its exit status. `serve` reads the process's own arguments instead and may end the process. */
 export async function runCommand(argv: string[]): Promise<number> {
   const invocation = parseInvocation(argv);
   const handler = Object.hasOwn(COMMANDS, invocation.command) ? COMMANDS[invocation.command] : undefined;
@@ -206,7 +206,8 @@ async function scratch({ config, argv, named }: Invocation): Promise<number> {
 }
 
 async function serve(): Promise<number> {
-  // The viewer reads its settings from the process's arguments and keeps the process alive while it listens.
+  // The viewer reads its settings from the process's arguments, keeps the process alive while it listens, and ends
+  // the process itself on a missing root or SIGTERM.
   await import("../viewer/server");
   return 0;
 }
@@ -292,18 +293,25 @@ async function ensureServer(config: Config): Promise<ViewerProblem | null> {
     return null;
   }
   const log = join(tmpdir(), `keylight-viewer-${config.port}.log`);
-  const out = openSync(log, "a");
   const args = [
     join(import.meta.dir, "..", "viewer", "server.ts"),
     "--root",
     config.root,
     "--port",
     String(config.port),
+    "--config",
+    config.configDir,
+    // Passed even when empty, so the viewer cannot fall back to a KEYLIGHT_PUBLIC_URL this invocation overrode.
+    "--public-url",
+    config.publicUrl ?? "",
   ];
-  args.push("--config", config.configDir);
-  if (config.publicUrl) args.push("--public-url", config.publicUrl);
-  const child = Bun.spawn([process.execPath, ...args], { stdio: ["ignore", out, out], detached: true });
-  child.unref();
+  const out = openSync(log, "a");
+  try {
+    const child = Bun.spawn([process.execPath, ...args], { stdio: ["ignore", out, out], detached: true });
+    child.unref();
+  } finally {
+    closeSync(out);
+  }
   for (let i = 0; i < 40; i++) {
     await Bun.sleep(100);
     if (await ping(config)) return null;
