@@ -9,7 +9,16 @@
 // The link is ignored through the repository's info/exclude, so nothing about
 // it is ever committed.
 
-import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { basename, dirname, join, relative } from "node:path";
 import type { Config } from "./config";
 import { nextLine } from "./say";
@@ -117,7 +126,12 @@ export function slugError(task: string): string | null {
 }
 
 /** `summary` is the text for a new task.md; an existing one is kept. */
-export function ensureTask(repo: Repo, config: Config, task: string, summary?: string): { store: string; isNew: boolean } {
+export function ensureTask(
+  repo: Repo,
+  config: Config,
+  task: string,
+  summary?: string,
+): { store: string; isNew: boolean } {
   const problem = slugError(task);
   if (problem) throw new TaskError(problem);
   const store = storeOf(repo, config, task);
@@ -137,7 +151,10 @@ export function ensureTask(repo: Repo, config: Config, task: string, summary?: s
   const link = join(repo.worktree, LINK_DIR, task);
   if (!existsSync(link)) {
     // A dangling link left behind (the store moved) is not replaced silently.
-    if (lstatSync(link, { throwIfNoEntry: false })) throw new TaskError(`${show(link)} exists but points nowhere. Remove it, then run the command again.\n${nextLine(`rm ${show(link)}`)}`);
+    if (lstatSync(link, { throwIfNoEntry: false }))
+      throw new TaskError(
+        `${show(link)} exists but points nowhere. Remove it, then run the command again.\n${nextLine(`rm ${show(link)}`)}`,
+      );
     mkdirSync(dirname(link), { recursive: true });
     symlinkSync(store, link, "dir");
   }

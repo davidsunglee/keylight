@@ -41,7 +41,10 @@ export function addEntry(home: { dir: string; label: string }, text: string): st
   const current = existsSync(path) ? readFileSync(path, "utf8") : header(home.label);
   // Entries are the page's second-level headings; the newest goes before the first of them.
   const first = current.search(/^## /m);
-  const page = first === -1 ? `${current.trimEnd()}\n\n${entry}\n` : `${current.slice(0, first)}${entry}\n\n---\n\n${current.slice(first)}`;
+  const page =
+    first === -1
+      ? `${current.trimEnd()}\n\n${entry}\n`
+      : `${current.slice(0, first)}${entry}\n\n---\n\n${current.slice(first)}`;
   writeFileSync(path, page);
   return path;
 }

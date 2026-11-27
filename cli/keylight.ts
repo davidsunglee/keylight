@@ -16,8 +16,16 @@ import { setupWorktree } from "./worktree";
 const argv = process.argv.slice(2);
 const command = argv[0] ?? "help";
 const VALUE_FLAGS = new Set([
-  "--root", "--port", "--public-url", "--config", "--task",
-  "--workflow", "--profile", "--name", "--from", "--until",
+  "--root",
+  "--port",
+  "--public-url",
+  "--config",
+  "--task",
+  "--workflow",
+  "--profile",
+  "--name",
+  "--from",
+  "--until",
 ]);
 const positional = argv.slice(1).filter((arg, i, rest) => !arg.startsWith("--") && !VALUE_FLAGS.has(rest[i - 1] ?? ""));
 
@@ -53,13 +61,22 @@ async function ensureServer(config: Config): Promise<ViewerProblem | null> {
   const running = await ping(config);
   if (running) {
     if (running.root !== config.root) {
-      return { why: `port ${config.port} already serves ${running.root}. Pass --port to use another port, or stop that viewer.`, fix: "keylight stop" };
+      return {
+        why: `port ${config.port} already serves ${running.root}. Pass --port to use another port, or stop that viewer.`,
+        fix: "keylight stop",
+      };
     }
     return null;
   }
   const log = join(tmpdir(), `keylight-viewer-${config.port}.log`);
   const out = openSync(log, "a");
-  const args = [join(import.meta.dir, "..", "viewer", "server.ts"), "--root", config.root, "--port", String(config.port)];
+  const args = [
+    join(import.meta.dir, "..", "viewer", "server.ts"),
+    "--root",
+    config.root,
+    "--port",
+    String(config.port),
+  ];
   args.push("--config", config.configDir);
   if (config.publicUrl) args.push("--public-url", config.publicUrl);
   const child = Bun.spawn([process.execPath, ...args], { stdio: ["ignore", out, out], detached: true });
@@ -159,13 +176,17 @@ async function main() {
     console.log(link);
     // Only a person at a terminal is told; an agent would relay the note as if it were a failure.
     if (problem && process.stderr.isTTY) {
-      const rest = problem.fix ? nextLine(problem.fix) : `The link works once the viewer is running.\n${nextLine("keylight view")}`;
+      const rest = problem.fix
+        ? nextLine(problem.fix)
+        : `The link works once the viewer is running.\n${nextLine("keylight view")}`;
       console.error(`keylight: ${problem.why}\n${rest}`);
     }
     if (command === "view" && !argv.includes("--no-open")) {
       // Open the local address: the public one may only resolve from other devices.
       const local = link.replace(config.publicUrl ?? localUrl(config), localUrl(config));
-      Bun.spawn([process.platform === "darwin" ? "open" : "xdg-open", local], { stdio: ["ignore", "ignore", "ignore"] });
+      Bun.spawn([process.platform === "darwin" ? "open" : "xdg-open", local], {
+        stdio: ["ignore", "ignore", "ignore"],
+      });
     }
     return;
   }
@@ -235,7 +256,10 @@ async function workflowCommand(config: Config, named: string | undefined): Promi
 
   if (!options.dryRun) {
     // Sessions print viewer links; an agent's sandbox may not be able to start the viewer itself.
-    if (!(await ensureServer(config))) console.log(`Documents: ${linkFor(config, storeOf(currentRepo(), config, currentTask(currentRepo(), options.named)))}`);
+    if (!(await ensureServer(config)))
+      console.log(
+        `Documents: ${linkFor(config, storeOf(currentRepo(), config, currentTask(currentRepo(), options.named)))}`,
+      );
   }
   return runWorkflow(config, workflows, options);
 }

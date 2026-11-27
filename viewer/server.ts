@@ -60,7 +60,13 @@ function themePicker(): string {
   const group = (kind: "dark" | "light", title: string) => {
     const items = set.themes
       .filter((t) => t.kind === kind)
-      .map((t) => choice(t.name, t.label, `<span class="swatch" style="background:${t.colors.bg};color:${t.colors.blue}"></span>`));
+      .map((t) =>
+        choice(
+          t.name,
+          t.label,
+          `<span class="swatch" style="background:${t.colors.bg};color:${t.colors.blue}"></span>`,
+        ),
+      );
     return items.length ? `<div class="theme-group">${title}</div>${items.join("")}` : "";
   };
   return (

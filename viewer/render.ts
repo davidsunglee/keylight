@@ -173,8 +173,7 @@ function sanitizeHtml(raw: string): string {
 
 function createMarkdown(): MarkdownIt {
   const md = new MarkdownIt({ html: true, linkify: true });
-  const fallback: RenderRule = (tokens, idx, options, _env, self) =>
-    self.renderToken(tokens, idx, options);
+  const fallback: RenderRule = (tokens, idx, options, _env, self) => self.renderToken(tokens, idx, options);
 
   md.renderer.rules.fence = (tokens, idx, _options, env: Env) => {
     const token = tokens[idx]!;
@@ -239,7 +238,11 @@ function createMarkdown(): MarkdownIt {
     const tokens = state.tokens;
     for (let i = 2; i < tokens.length; i++) {
       const inline = tokens[i]!;
-      if (inline.type !== "inline" || tokens[i - 1]!.type !== "paragraph_open" || tokens[i - 2]!.type !== "list_item_open") {
+      if (
+        inline.type !== "inline" ||
+        tokens[i - 1]!.type !== "paragraph_open" ||
+        tokens[i - 2]!.type !== "list_item_open"
+      ) {
         continue;
       }
       const first = inline.children?.[0];
@@ -260,7 +263,8 @@ function createMarkdown(): MarkdownIt {
   // up to the next heading of that level or higher is the body. The top level
   // is the highest one in use below the title.
   md.core.ruler.push("foldable-sections", (state) => {
-    const levelOf = (token: Token) => (token.type === "heading_open" && token.level === 0 ? Number(token.tag.slice(1)) : 0);
+    const levelOf = (token: Token) =>
+      token.type === "heading_open" && token.level === 0 ? Number(token.tag.slice(1)) : 0;
     const top = Math.min(...state.tokens.map(levelOf).filter((level) => level > 1));
     const block = (type: string, tag: string, nesting: 1 | -1): Token => {
       const token = new state.Token(type, tag, nesting) as Token;
