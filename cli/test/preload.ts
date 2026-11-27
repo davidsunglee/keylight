@@ -2,7 +2,7 @@
 // so a run at a developer's terminal behaves as a run on CI does: no stream is
 // a terminal, standard input is empty, and a question no test scripted fails at
 // once instead of waiting for an answer. Refuses to run where git is pointed at
-// another repository.
+// another repository or given settings through the environment.
 
 import { afterAll, mock } from "bun:test";
 import { rmSync } from "node:fs";
@@ -15,12 +15,14 @@ afterAll(() => {
 });
 
 // Bun starts every child process with the environment the run started with, so
-// no test can clear these for the git commands production code runs.
+// no test can clear these for the git commands production code runs. The
+// config variables outrank the fixture repository's own settings.
 const redirects = ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_COMMON_DIR"];
-const set = redirects.filter((name) => process.env[name]);
+const configOverrides = ["GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS"];
+const set = [...redirects, ...configOverrides].filter((name) => process.env[name]);
 if (set.length) {
   throw new Error(
-    `unset ${set.join(", ")} before running the tests: git would act on that repository, not the tests' own`,
+    `unset ${set.join(", ")} before running the tests: git would act on another repository or with settings that override the tests' own`,
   );
 }
 
