@@ -1,6 +1,6 @@
 ---
 name: implement-outline
-description: Implement a structure outline one phase at a time, with a sub-agent per phase and a human check between phases.
+description: Implement a structure outline one phase at a time, with a sub-agent per phase, pausing only for the manual checks the outline lists.
 disable-model-invocation: true
 ---
 
@@ -22,13 +22,15 @@ When invoked:
 
 **Document precedence**: structure outline > TDD > PRD > research > ticket. When documents conflict, the outline takes precedence.
 
-**Progress tracking**: The implementer updates the outline document as work completes:
-- Validation checkboxes: `- [ ]` → `- [x]` when automated verification passes
-- Phase titles: `## Phase N: Title` → `## ✅ Phase N: Title` when all phase validation is confirmed
+**Progress tracking**: the outline records progress as work completes:
+- Validation checkboxes: `- [ ]` → `- [x]` when a check passes
+- Phase titles: `## Phase N: Title` → `## ✅ Phase N: Title` when the phase is verified. The implementer marks a phase that has no manual checks; you mark a phase that has them, once the human has confirmed.
 
 ## Workflow
 
-For each phase in the structure outline:
+Work through the phases in order, straight from one into the next. The human is needed at two points only: a manual check the outline lists, and an issue the implementer could not resolve.
+
+For each phase:
 
 ### 1. Dispatch the implementer
 
@@ -52,41 +54,40 @@ Update progress markers in the outline as you complete validation steps.
 
 IMPORTANT — keep your prompt short. The implementer reads the documents itself. Do not duplicate the outline contents in your prompt.
 
-### 2. Report to Human
+### 2. Settle the phase's manual checks
 
-After the implementer completes, summarize the phase:
-```
-## Phase [N] Complete
+Read the phase's `#### Manual Verification` list in the outline.
 
-**What was done:**
-- [Brief summary of changes]
+- **No list, or no unchecked item in it**: the phase is verified. Go to step 3.
+- **Unchecked items**: report and wait.
+  ```
+  ## Phase [N]: manual checks
 
-**Manual verification needed:**
-- [List manual checks from the outline's Validation section]
+  **What was done:**
+  - [Brief summary of changes]
 
-Ready for Phase [N+1] when you confirm, or let me know if anything needs adjustment.
-```
+  **Please check:**
+  - [Each unchecked manual item from the outline]
+  ```
+  When the human confirms, check the items off and mark the phase title ✅. When they report a problem, dispatch the implementer again with what they found, then return to this step.
 
-### 3. Wait for Human Confirmation
+A manual check that states its own condition ("inspect the screenshots that differ") needs the human only when the condition holds. When it does not hold, check the item off and add a few words saying why.
 
-Ask for the human to:
-- Confirm manual checks passed
-- Report any issues found
-- Give permission to continue to the next phase
-
-### 4. Commit the Changes
+### 3. Commit the phase
 
 - Create a new commit for the changes
 - Stage only the files the phase changed, and follow the repository's commit instructions: its `AGENTS.md` or `CLAUDE.md`, and the style of `git log --oneline -5`
 - Task documents live outside the repository and git ignores `.artifacts/`, so they stay out of the commit
 
-### 5. Review, when the user wants it
+### 4. Review the phase when the outline calls for it
 
-When the user has asked for phases to be reviewed, run the `review-loop` skill on the committed phase before starting the next one. Its boundary is the phase (`phase-N`) and its fixed point is the starting commit you noted in step 1.
+The outline decides which phases get a review: normally in the phase's `#### Review`, sometimes in its overview. Run the `review-loop` skill on the committed phase when the outline calls for it, or the user asked for reviews. Where the outline is silent about a phase, the decision is yours, by the review rule in [`../create-structure-outline/SKILL.md`](../create-structure-outline/SKILL.md).
 
-### 6. Repeat for Next Phase
+The review's boundary is the phase (`phase-N`) and its fixed point is the starting commit you noted in step 1. Commit whatever the review changed.
 
-When prompted, repeat this workflow for the next phase.
+### 5. Start the next phase
+
+Go on to the next phase without waiting.
 
 ## Special Instructions
 
@@ -106,35 +107,9 @@ If the implementer reports a mismatch or gets stuck:
 - Wait for guidance before proceeding
 - Consider whether the outline needs to be updated based on codebase evolution
 
-### Multiple Phases
-
-If instructed to implement multiple phases consecutively:
-- Still dispatch a separate implementer for each phase
-- Perform verification between phases
-- Report a summary after all requested phases complete
-- Only pause for human verification after the final phase
-
-### Waiting for Input
-
-Unless expressly asked, don't commit or proceed to a next phase until the human has reviewed and approved the previous phase.
-
-Workflow checklist:
-
-- [ ] run `keylight task` and discover the documents
-- [ ] read the structure outline to understand phases
-- [ ] note the starting commit, then dispatch an `outline-implementer` sub-agent for Phase 1
-- [ ] report a summary and ask the human to perform manual verification
-- [ ] iterate with the human until the results are satisfactory
-- [ ] commit the changes
-- [ ] run `review-loop` on the phase if the user asked for review
-- [ ] dispatch the implementer for the next phase
-
 ## After Final Phase Completion
 
-When ALL phases are complete and verified:
-
-1. Commit the final changes
-2. Respond with exactly this, filling in the outline's link from `keylight url <path>`. Do not include a summary or other information.
+When every phase title carries ✅ and every phase is committed, respond with exactly this, filling in the outline's link from `keylight url <path>`. Do not include a summary or other information.
 
 ```markdown
 ### Status

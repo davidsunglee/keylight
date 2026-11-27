@@ -114,9 +114,12 @@ Be tasteful and thoughtful about how and where you include code snippets, and pr
 
 ## Phase Validation Design
 
-Each phase has a `### Validation` section with two subsections:
+Each phase has a `### Validation` section with three subsections:
 - `#### Automated Verification`: runnable commands (typecheck, tests, lint)
 - `#### Manual Verification`: steps requiring human judgment
+- `#### Review`: yes or no, and why in a few words. On yes, the implementation runs `review-loop` on the phase once it is committed.
+
+**Review rule**: a phase gets a review when it changes behavior, test infrastructure or CI. A formatting-only or mechanical phase does not.
 
 Not every phase requires manual validation — don't add manual steps just to have them. 
 If a phase cannot be manually checked, it may be too small or not vertical enough.

@@ -115,4 +115,6 @@ code change and then having to figure out which part went wrong.
 
 Automated testing is always better than manual testing - be thoughtful based on your knowledge
 of the codebase and testing patterns, and be clear about which tests are manual versus automated.
+
+Each phase's `#### Review` follows the review rule in [`../create-structure-outline/SKILL.md`](../create-structure-outline/SKILL.md).
 </guidance>

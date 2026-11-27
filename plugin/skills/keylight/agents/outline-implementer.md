@@ -39,33 +39,26 @@ If you encounter a mismatch:
 1. **Validation checkboxes**: When automated verification passes, update checkboxes:
    `- [ ] \`bun run typecheck\`` → `- [x] \`bun run typecheck\``
 
-2. **Phase completion**: When ALL validation for a phase passes (automated AND manual confirmed), mark the phase title:
+2. **Phase completion**: When every automated check passes and the phase lists no manual verification, mark the phase title:
    `## Phase 1: Title` → `## ✅ Phase 1: Title`
+   A phase that lists manual verification keeps its title as it is: whoever dispatched you marks it once the human has checked.
 
 Edit the outline in place. This creates a persistent record of progress, and the user watches it update in the viewer.
 
 ## Verification Approach
 
-After implementing a phase:
+After implementing the phase:
 1. Run all automated verification commands listed in the Validation section
 2. Fix any issues before marking checkboxes complete
-3. Update checkboxes in the outline
-4. **Pause for human verification**: After automated checks pass, report:
+3. Update the outline
+4. Report back:
    ```
-   Phase [N] Complete - Ready for Manual Verification
-
-   Automated verification passed:
+   Phase [N]: automated verification passed
    - [List automated checks that passed]
 
-   Please perform the manual verification steps listed in the outline:
-   - [List manual verification items]
-
-   Let me know when manual testing is complete so I can mark the phase complete.
+   Manual verification left for the human:
+   - [The phase's manual verification items, or "none"]
    ```
-
-Leave the phase title without ✅ until the human confirms manual verification passed.
-
-If instructed to execute multiple phases consecutively, skip the pause until the last phase.
 
 Leave committing to whoever dispatched you. Task documents are outside the repository and never part of a commit.
 

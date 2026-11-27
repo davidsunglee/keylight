@@ -91,6 +91,10 @@ interface RecordSummary {
 - [ ] [manual test step]
 - [ ] ...
 
+#### Review
+
+[Yes or no, and why in a few words]
+
 ---
 
 ## Phase 2: [Phase Title]
