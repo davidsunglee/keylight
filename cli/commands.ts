@@ -7,8 +7,7 @@ import { closeSync, existsSync, mkdirSync, openSync, realpathSync } from "node:f
 import { tmpdir } from "node:os";
 import { join, relative, resolve, sep } from "node:path";
 import type { Subprocess } from "bun";
-import { urlPath } from "../viewer/render";
-import { startViewer } from "../viewer/server";
+import { startViewer, viewPath } from "../viewer/server";
 import { type Config, flag, loadConfig, localUrl } from "./config";
 import { gatePrompt, initState, printStatus, type RunOptions, readState, recordWorktree, runWorkflow } from "./run";
 import { nextLine } from "./say";
@@ -361,5 +360,5 @@ function linkFor(config: Config, target: string | undefined): string {
       `${target} is not under the artifact root ${config.root}. Pass --root to view another directory.`,
     );
   }
-  return rel ? `${base}/view/${urlPath(rel)}` : `${base}/`;
+  return rel ? `${base}${viewPath(rel)}` : `${base}/`;
 }
