@@ -25,6 +25,7 @@ When invoked:
 **Progress tracking**: the outline records progress as work completes:
 - Validation checkboxes: `- [ ]` → `- [x]` when a check passes. The implementer checks off the automated ones.
 - Phase titles: `## Phase N: Title` → `## ✅ Phase N: Title`. You mark it, as the last act of the phase, so ✅ means done: implemented, committed, reviewed where the outline calls for it, and checked by the human where it lists manual checks.
+- The Implementation Overview at the top lists every phase: `- [ ] Phase N: Title` → `- [x] Phase N: Title`, ticked when you mark that phase's title.
 
 ## Workflow
 
@@ -69,6 +70,7 @@ IMPORTANT — keep your prompt short. The implementer reads the documents itself
 - Create a new commit for the changes
 - Stage only the files the phase changed, and follow the repository's commit instructions: its `AGENTS.md` or `CLAUDE.md`, and the style of `git log --oneline -5`
 - Task documents live outside the repository and git ignores `.artifacts/`, so they stay out of the commit
+- For a phase that gets a review, put the new commit in the review prompt's front matter as `head`. The implementer wrote the prompt before the commit existed.
 
 ### 3. Review the phase when the outline calls for it
 
@@ -97,7 +99,7 @@ A manual check that states its own condition ("inspect the screenshots that diff
 
 ### 5. Mark the phase done and start the next
 
-Mark the phase title ✅, then go on to the next phase without waiting.
+Mark the phase title ✅ and tick the phase in the Implementation Overview, then go on to the next phase without waiting.
 
 ## Special Instructions
 
