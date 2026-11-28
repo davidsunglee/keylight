@@ -6,7 +6,8 @@ name: check
 
 on:
   pull_request:
-    # edited includes a change of base branch, which moves the range and the test merge.
+    # edited includes a change of base branch, which moves the range and the test merge. It also fires for a
+    # new title or description, which the changes job answers without running the checks again.
     types: [opened, synchronize, reopened, edited]
   push:
     branches: [main]
@@ -17,8 +18,41 @@ permissions:
   contents: read
 
 jobs:
+  # A skipped job counts as passed. So after a change of title or description the five checks are skipped only
+  # when each of them last passed on this commit; otherwise they run, as they do for every other event.
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      checks: read
+    outputs:
+      run: ${{ steps.decide.outputs.run }}
+    steps:
+      - id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DESCRIPTION_ONLY: ${{ github.event.action == 'edited' && !github.event.changes.base }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          run=true
+          if [ "$DESCRIPTION_ONLY" = true ]; then
+            # Each check's latest result on this commit, leaving out this run and results that were themselves skips.
+            passed=$(gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/commits/$HEAD/check-runs?per_page=100" |
+              jq -r --arg run "/runs/$GITHUB_RUN_ID/" '
+                [.[].check_runs[]
+                  | select(.app.slug == "github-actions" and .conclusion != "skipped")
+                  | select(.details_url | contains($run) | not)]
+                | group_by(.name) | map(max_by(.id) | select(.conclusion == "success") | .name) | join(" ")')
+            echo "passed on $HEAD: $passed"
+            for job in audit browser check commits harness; do
+              case " $passed " in *" $job "*) ;; *) job= && break ;; esac
+            done
+            [ -n "$job" ] && run=false
+          fi
+          echo "run=$run" >>"$GITHUB_OUTPUT"
+
   check:
-    if: github.event_name != 'schedule'
+    needs: changes
+    if: github.event_name != 'schedule' && needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -27,7 +61,8 @@ jobs:
       - run: bun run check
 
   browser:
-    if: github.event_name != 'schedule'
+    needs: changes
+    if: github.event_name != 'schedule' && needs.changes.outputs.run == 'true'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v7
@@ -37,7 +72,8 @@ jobs:
       - run: bun run check:browser
 
   audit:
-    if: github.event_name != 'schedule'
+    needs: changes
+    if: github.event_name != 'schedule' && needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -45,7 +81,8 @@ jobs:
       - run: bun run check:audit
 
   commits:
-    if: github.event_name != 'schedule'
+    needs: changes
+    if: github.event_name != 'schedule' && needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     env:
       BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
@@ -61,6 +98,8 @@ jobs:
       - run: bun run check:commits "$BASE"
 
   harness:
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
