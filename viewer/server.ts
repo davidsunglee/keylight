@@ -53,6 +53,11 @@ interface WatchedThemes {
   close(): void;
 }
 
+/** The address, under the viewer's own, of the page for a document or directory at `rel` below the root. */
+export function viewPath(rel: string): string {
+  return `/view/${urlPath(rel)}`;
+}
+
 /** Serves `options.root`, which must exist, on loopback at `options.port` until stopped. */
 export function startViewer(options: ViewerOptions): Viewer {
   const allowedHosts = new Set(["localhost", "127.0.0.1", "[::1]"]);
@@ -285,7 +290,7 @@ function ago(ms: number): string {
 }
 
 function entryHref(e: Entry): string {
-  return (e.kind === "doc" || e.kind === "dir" ? "/view/" : "/raw/") + urlPath(e.rel);
+  return e.kind === "doc" || e.kind === "dir" ? viewPath(e.rel) : `/raw/${urlPath(e.rel)}`;
 }
 
 const SIDEBAR_TOGGLE =
@@ -351,7 +356,7 @@ function crumbs(rel: string, taskName?: string): string {
     acc = acc ? join(acc, part) : part;
     const last = i === parts.length - 1;
     const label = escapeHtml(taskName && i === parts.length - 2 ? taskName : part);
-    return last ? `<span class="here">${label}</span>` : `<a href="/view/${urlPath(acc)}">${label}</a>`;
+    return last ? `<span class="here">${label}</span>` : `<a href="${viewPath(acc)}">${label}</a>`;
   });
   return ['<a href="/" class="home">Artifacts</a>', ...links].join('<span class="sep">/</span>');
 }
@@ -471,9 +476,9 @@ function indexPage(site: Site): string {
     const search = escapeHtml(`${t.name} ${t.group} ${t.rel}`.toLowerCase());
     return (
       `<li class="task" data-search="${search}"><div class="task-head">` +
-      `<a class="task-name" href="/view/${urlPath(t.rel)}">${escapeHtml(t.name)}</a>` +
+      `<a class="task-name" href="${viewPath(t.rel)}">${escapeHtml(t.name)}</a>` +
       `<span class="when">${t.group ? `${escapeHtml(t.group)} &middot; ` : ""}${ago(t.mtime)}</span></div>` +
-      `<div class="chips">${chips.join("")}${other > 0 ? `<a class="chip more" href="/view/${urlPath(t.rel)}">+${other}</a>` : ""}</div></li>`
+      `<div class="chips">${chips.join("")}${other > 0 ? `<a class="chip more" href="${viewPath(t.rel)}">+${other}</a>` : ""}</div></li>`
     );
   });
   return shell(site, {
@@ -646,7 +651,7 @@ async function serveFragment(site: Site, abs: string): Promise<Response> {
 }
 
 function serveRaw(site: Site, abs: string): Response {
-  if (statSync(abs).isDirectory()) return Response.redirect(`/view/${urlPath(relative(site.root, abs))}`, 302);
+  if (statSync(abs).isDirectory()) return Response.redirect(viewPath(relative(site.root, abs)), 302);
   const file = Bun.file(abs);
   const headers: Record<string, string> = { "cache-control": "no-store", "x-content-type-options": "nosniff" };
   // HTML, SVG and other XML documents can run their own scripts. Sandboxing
