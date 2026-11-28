@@ -78,6 +78,7 @@ keylight start "what to build" --workflow direct
 keylight run                            # continue from the first unfinished step
 keylight run --from tdd                 # go back to a step: continues its session (--fresh starts it over)
 keylight run --from tdd --until tdd     # one step; --dry-run prints the commands instead
+keylight run --note "start with the CLI"  # a note for the first session the run starts
 keylight status                         # the steps and how far they are
 ```
 
@@ -85,10 +86,27 @@ keylight status                         # the steps and how far they are
   research questions, research, implementation from decisions, review, pull
   request. Messages and tool calls are shown as they happen.
 - **Interactive steps** are ordinary sessions. When you quit one, the runner
-  asks whether the step is finished: yes and start the next, yes and stop, or
-  not yet. "Not yet" keeps the step open, and the next `keylight run` resumes the
-  same session, in Claude Code and in Codex. `confirm: false` on the step skips
-  the question.
+  asks whether the step is complete:
+
+  ```text
+  Is the technical design complete?
+  (1) Yes, proceed to the structure outline
+  (2) Yes, stop for now
+  (3) Yes, send a note to the next session
+  (4) No
+  Choose 1-4 [1]:
+  ```
+
+  Enter picks the first answer. "No" keeps the step open, and the next
+  `keylight run` resumes the same session, in Claude Code and in Codex.
+  `confirm: false` on the step skips the question, and `title` sets how the
+  question names it.
+- **A note for the next session.** The third answer asks for a line of text
+  and adds it to the opening message of the next step that starts a session.
+  `keylight run --note "…"` does the same for the first session a run starts.
+  A note reaches new sessions only, so the answer is not offered when the next
+  step would resume its session. `keylight status` shows a note until its step
+  is done.
 - **A step is finished when its evidence is there**: its document exists, or
   every phase heading in the decisions document carries ✅, or its `check`
   command passes. Otherwise the runner stops and says what is missing.

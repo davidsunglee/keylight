@@ -6,6 +6,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 export interface Step {
+  /** How a question to the user names the step, e.g. "the technical design". Without one, the step's name. */
+  title?: string;
   skill?: string;
   run?: "worktree";
   session?: "headless" | "interactive";

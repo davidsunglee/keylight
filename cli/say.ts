@@ -1,6 +1,13 @@
-// The two shapes the CLI uses when it hands a decision back to the user:
+// The shapes the CLI uses when it hands a decision back to the user:
 //
-//   Is tdd finished? [Enter] yes, start structure-outline · [s] yes, stop here · [n] not yet:
+//   Is the technical design complete?
+//   (1) Yes, proceed to the structure outline
+//   (2) Yes, stop for now
+//   (3) Yes, send a note to the next session
+//   (4) No
+//   Choose 1-4 [1]:
+//
+//   Task name? [Enter] retry-policy · or type another:
 //
 //   tdd is left open.
 //   Next:  keylight run
@@ -32,10 +39,17 @@ function readLine(): string | null {
 }
 
 /** Returns the trimmed answer ("" for a bare Enter), or null when the input has ended. `orType` names what free text means. */
-export function ask(question: string, choices: Choice[], orType?: string): string | null {
+export function ask(question: string, choices: Choice[] = [], orType?: string): string | null {
   const listed = choices.map(([key, meaning]) => `[${key}] ${meaning}`);
   if (orType) listed.push(`or type ${orType}`);
-  process.stdout.write(`${question} ${listed.join(" · ")}: `);
+  process.stdout.write(`${question}${listed.length ? ` ${listed.join(" · ")}` : ""}: `);
+  return readLine()?.trim() ?? null;
+}
+
+/** A question with numbered answers, the first being the one a bare Enter picks. Returns what was typed, as `ask` does. */
+export function choose(question: string, options: string[]): string | null {
+  const lines = options.map((option, i) => `(${i + 1}) ${option}`);
+  process.stdout.write(`${[question, ...lines].join("\n")}\nChoose 1-${options.length} [1]: `);
   return readLine()?.trim() ?? null;
 }
 

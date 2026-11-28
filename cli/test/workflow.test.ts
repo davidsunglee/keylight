@@ -39,7 +39,12 @@ describe("loadWorkflows", () => {
       "pr",
     ]);
     expect(Object.keys(workflows.workflows)).toEqual(["direct", "design", "product"]);
-    expect(workflows.steps.tdd).toEqual({ skill: "kl:create-tdd", session: "interactive", produces: "tdd" });
+    expect(workflows.steps.tdd).toEqual({
+      title: "the technical design",
+      skill: "kl:create-tdd",
+      session: "interactive",
+      produces: "tdd",
+    });
     expect(workflows.profiles).toEqual({ default: { "*": { harness: "claude" } } });
     expect(load("")).toEqual(workflows);
     expect(load("# nothing but a comment\n")).toEqual(workflows);
@@ -69,7 +74,12 @@ describe("loadWorkflows", () => {
     expect(workflows.workflows.mine).toEqual(["tdd", "review"]);
     expect(workflows.workflows.direct).toEqual(["grill"]);
     expect(workflows.workflows.design).toHaveLength(7);
-    expect(workflows.steps.tdd).toEqual({ skill: "kl:create-tdd", session: "headless", produces: "tdd" });
+    expect(workflows.steps.tdd).toEqual({
+      title: "the technical design",
+      skill: "kl:create-tdd",
+      session: "headless",
+      produces: "tdd",
+    });
     expect(workflows.steps.extra).toEqual({ skill: "kl:extra", session: "headless" });
     expect(workflows.profiles.default).toEqual({ "*": { harness: "claude", model: "opus" } });
     expect(workflows.profiles.fast).toEqual({ "*": { harness: "codex" } });

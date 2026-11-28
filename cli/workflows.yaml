@@ -13,6 +13,7 @@ workflows:
   product: [research-questions, research, prd, tdd, structure-outline, worktree, implement-outline, pr]
 
 # Step fields:
+#   title     how a question to you names the step; without one, the step's name
 #   skill     the skill the session opens with; keylight's own are kl:<name>
 #   run       a step done by code instead of a session (only `worktree`)
 #   session   headless: runs unattended to the end, then the next step starts
@@ -28,26 +29,32 @@ workflows:
 #             finished and continue without asking
 steps:
   research-questions:
+    title: the research questions
     skill: kl:create-research-questions
     session: headless
     produces: research-questions
   research:
+    title: the research
     skill: kl:create-research
     session: headless
     produces: research
   prd:
+    title: the product requirements
     skill: kl:create-prd
     session: interactive
     produces: prd
   tdd:
+    title: the technical design
     skill: kl:create-tdd
     session: interactive
     produces: tdd
   structure-outline:
+    title: the structure outline
     skill: kl:create-structure-outline
     session: interactive
     produces: structure-outline
   grill:
+    title: the grilling
     skill: grilling
     session: interactive
     produces: decisions
@@ -58,17 +65,21 @@ steps:
 
       When we have reached a shared understanding, write the decisions document to the path that `keylight task next decisions <description>` prints, following the template at {{ skills }}/implement-decisions/decisions-template.md. Then tell me it is written: quitting this session starts the implementation.
   worktree:
+    title: the worktree
     run: worktree
   implement-outline:
+    title: the implementation
     skill: kl:implement-outline
     session: interactive
     in: worktree
   implement-decisions:
+    title: the implementation
     skill: kl:implement-decisions
     session: headless
     in: worktree
     phases: decisions
   review:
+    title: the review
     skill: kl:review-loop
     session: headless
     in: worktree
@@ -85,6 +96,7 @@ steps:
       jq -e '.verdict == "clean"'
       "$(ls -d "$KEYLIGHT_TASK_DIR"/review-loop/implementation/round-* | sort | tail -1)/findings.json"
   pr:
+    title: the pull request
     skill: kl:describe-pr
     session: headless
     in: worktree
