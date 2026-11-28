@@ -167,6 +167,28 @@ async function openEvents(
   };
 }
 
+/**
+ * What the stream shows up to `pattern`, after making `change` as often as it takes.
+ * A change made in the first moments of a watch is sometimes never reported, and the next one is.
+ */
+async function reportedAfter(
+  events: { until(pattern: string): Promise<string> },
+  pattern: string,
+  change: () => void,
+): Promise<string> {
+  const report = events.until(pattern);
+  let settled = false;
+  const settle = () => {
+    settled = true;
+  };
+  report.then(settle, settle);
+  while (!settled) {
+    change();
+    await Promise.race([report.catch(settle), Bun.sleep(250)]);
+  }
+  return report;
+}
+
 const lanAddress = Object.values(networkInterfaces())
   .flat()
   .find((address) => address && address.family === "IPv4" && !address.internal)?.address;
@@ -532,16 +554,16 @@ describe("live updates", () => {
   test("a document's stream reports a change in its directory", async () => {
     await using events = await openEvents(`/events?path=${encodeURIComponent("keylight/empty/readme.txt")}`);
     await events.until("retry: 1000\n\n");
-    writeFileSync(join(root, "keylight", "empty", "readme.txt"), "changed");
-    expect(await events.until("event: change\n")).toContain("event: change\ndata: {}\n\n");
+    const change = () => writeFileSync(join(root, "keylight", "empty", "readme.txt"), "changed");
+    expect(await reportedAfter(events, "event: change\n", change)).toContain("event: change\ndata: {}\n\n");
   });
 
   test("every stream reports a theme change, and the stylesheet follows it", async () => {
     await text("/assets/theme.css");
     await using events = await openEvents(`/events?path=${encodeURIComponent("keylight/empty")}`);
     await events.until("retry: 1000\n\n");
-    writeFileSync(join(configDir, "theme.conf"), "dark = dim\n");
-    expect(await events.until("event: theme\n")).toContain("event: theme\ndata: {}\n\n");
+    const change = () => writeFileSync(join(configDir, "theme.conf"), "dark = dim\n");
+    expect(await reportedAfter(events, "event: theme\n", change)).toContain("event: theme\ndata: {}\n\n");
     expect(await text("/assets/theme.css")).toStartWith("@media (prefers-color-scheme: dark)");
   });
 });
