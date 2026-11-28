@@ -21,6 +21,7 @@ import {
   type Launch,
   launchFor,
   loadWorkflows,
+  profileProblem,
   SKILLS_DIR,
   type Step,
   type Workflows,
@@ -428,6 +429,10 @@ function runContext(config: Config, workflows: Workflows, options: RunOptions): 
   const repo = currentRepo();
   const task = currentTask(repo, options.named);
   const store = storeOf(repo, config, task);
+  // Checked before anything is recorded, so a mistyped name is never kept as the task's own.
+  if (options.workflow) workflowNamed(workflows, options.workflow);
+  const unknown = options.profile ? profileProblem(workflows, options.profile) : null;
+  if (unknown) throw new ConfigError(unknown);
   let state = readState(store);
   if (!state) {
     state = initState(
@@ -439,7 +444,6 @@ function runContext(config: Config, workflows: Workflows, options: RunOptions): 
       !options.dryRun,
     );
   } else if (options.workflow || options.profile) {
-    if (options.workflow) workflowNamed(workflows, options.workflow);
     state.workflow = options.workflow ?? state.workflow;
     state.profile = options.profile ?? state.profile;
     if (!options.dryRun) writeState(store, state);
@@ -505,6 +509,11 @@ function reportStop(step: string, outcome: Exclude<Outcome, "done">, next: strin
   return 1;
 }
 
+/** The command that gives a task a profile the settings define, for one whose own has gone from them. */
+function profileFix(workflows: Workflows): string {
+  return nextLine(`keylight run --profile ${workflows.profile}`);
+}
+
 /** Keeps --note for the first session the run starts, which must be a new one: a resumed session takes no opening message. */
 function takeNote(ctx: RunContext, range: StepRange, options: RunOptions) {
   const index = range.steps.findIndex((name) => ctx.workflows.steps[name]?.skill);
@@ -526,6 +535,8 @@ export async function runWorkflow(config: Config, workflows: Workflows, options:
     console.log(`Every step of ${ctx.state.workflow} is done for ${ctx.task}.`);
     return 0;
   }
+  const gone = profileProblem(ctx.workflows, ctx.state.profile);
+  if (gone) throw new TaskError(`${gone}\n${profileFix(ctx.workflows)}`);
   if (options.note) takeNote(ctx, range, options);
   console.log(`${bold(ctx.task)}  ${dim(`${ctx.state.workflow} workflow · ${ctx.state.profile} profile`)}`);
   for (const [index, name] of range.steps.entries()) {
@@ -553,25 +564,38 @@ function documentNote(step: Step, store: string, workflows: Workflows): string {
   return total ? `${doc}  ${done}/${total} phases` : doc;
 }
 
-/** What a step's status line says after its name: its document once it has started, how it will launch before. */
-function stepSummary(name: string, state: State, store: string, workflows: Workflows): string {
+/**
+ * What a step's status line says after its name: its document once it has started, how it will launch before.
+ * A launch the settings cannot describe leaves the line empty and is added to `problems`.
+ */
+function stepSummary(name: string, state: State, store: string, workflows: Workflows, problems: Set<string>): string {
   const step = workflows.steps[name]!;
   if (state.steps[name]?.status) return documentNote(step, store, workflows);
-  return dim(step.run ? "code" : sessionLabel(step, launchFor(workflows, state.profile, name)));
+  if (step.run) return dim("code");
+  try {
+    return dim(sessionLabel(step, launchFor(workflows, state.profile, name)));
+  } catch (err) {
+    if (!(err instanceof ConfigError)) throw err;
+    problems.add(err.message);
+    return "";
+  }
 }
 
-function printSteps(state: State, store: string, workflows: Workflows) {
+/** Prints the steps, and returns what in the settings kept a step's launch from being shown. */
+function printSteps(state: State, store: string, workflows: Workflows): string[] {
   const steps = workflowNamed(workflows, state.workflow);
   const width = Math.max(...steps.map((name) => name.length));
+  const problems = new Set<string>();
   let nextShown = false;
   for (const name of steps) {
     const status = state.steps[name]?.status;
     const symbol = status === "done" ? "✓" : status === "started" || !nextShown ? "▸" : "·";
     if (status !== "done") nextShown = true;
-    console.log(`  ${symbol} ${name.padEnd(width)}  ${stepSummary(name, state, store, workflows)}`);
+    console.log(`  ${symbol} ${name.padEnd(width)}  ${stepSummary(name, state, store, workflows, problems)}`);
     const note = status === "done" ? undefined : state.notes?.[name];
     if (note) console.log(dim(`    note: ${note}`));
   }
+  return [...problems];
 }
 
 export function printStatus(config: Config, workflows: Workflows, named: string | undefined): number {
@@ -586,7 +610,9 @@ export function printStatus(config: Config, workflows: Workflows, named: string 
   }
   console.log(`workflow  ${state.workflow}  (profile ${state.profile})`);
   if (state.worktree) console.log(`worktree  ${state.worktree}`);
-  printSteps(state, store, workflows);
+  const problems = printSteps(state, store, workflows);
   console.log(`store     ${relative(process.cwd(), store) || "."}`);
+  for (const problem of problems) console.log(problem);
+  if (problems.length && profileProblem(workflows, state.profile)) console.log(profileFix(workflows));
   return 0;
 }

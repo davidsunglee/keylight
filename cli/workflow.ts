@@ -141,10 +141,16 @@ export function workflowNamed(config: Workflows, name: string): string[] {
   return steps;
 }
 
+/** Why `name` cannot be used as a profile, or null when the settings define it. */
+export function profileProblem(config: Workflows, name: string): string | null {
+  if (config.profiles[name]) return null;
+  return `no profile named "${name}". Known: ${Object.keys(config.profiles).join(", ")}`;
+}
+
 function profileNamed(config: Workflows, name: string): Record<string, Partial<Launch>> {
-  const profile = config.profiles[name];
-  if (!profile) throw new ConfigError(`no profile named "${name}". Known: ${Object.keys(config.profiles).join(", ")}`);
-  return profile;
+  const problem = profileProblem(config, name);
+  if (problem) throw new ConfigError(problem);
+  return config.profiles[name]!;
 }
 
 export function launchFor(config: Workflows, profileName: string, step: string): Launch {

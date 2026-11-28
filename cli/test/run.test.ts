@@ -3,10 +3,22 @@
 // each session was launched with, and what the runner records and reports.
 
 import { describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, readdirSync, readFileSync, utimesSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Launch } from "./fakes/harness";
-import { atTerminal, FIXTURES, fakeHarness, git, keylight, type TempRepo, tempRepo } from "./support";
+import {
+  banners,
+  documents,
+  done,
+  logs,
+  plain,
+  readState,
+  stepOf,
+  valueAfter,
+  writeState,
+  writeWorkflows,
+} from "./run-support";
+import { FIXTURES, fakeHarness, git, keylight, tempRepo } from "./support";
 
 const SKILLS = join(import.meta.dir, "../../plugin/skills");
 const HEADLESS = join(FIXTURES, "claude-headless.jsonl");
@@ -15,56 +27,6 @@ const MODEL_ERROR = join(FIXTURES, "claude-model-error.jsonl");
 const UNATTENDED =
   "Nobody is watching this session. Finish the skill without asking questions; where it tells you to wait for the user, stop and say why.";
 const DESIGN = ["research-questions", "research", "tdd", "structure-outline", "worktree", "implement-outline", "pr"];
-
-interface StepState {
-  status: string;
-  at: string;
-  harness?: string;
-  session?: string;
-}
-interface State {
-  workflow: string;
-  profile: string;
-  checkout: string;
-  worktree?: string;
-  base?: string;
-  steps: Record<string, StepState>;
-  notes?: Record<string, string>;
-}
-
-const plain = (text: string) => Bun.stripANSI(text);
-const banners = (stdout: string) =>
-  plain(stdout)
-    .split("\n")
-    .filter((line) => line.startsWith("▸ "));
-const stepOf = (launch: Launch) => launch.env.KEYLIGHT_STEP;
-const valueAfter = (launch: Launch, flag: string) => launch.argv[launch.argv.indexOf(flag) + 1] ?? "";
-const readState = (repo: TempRepo, task = "demo") =>
-  JSON.parse(readFileSync(join(repo.store(task), ".keylight.json"), "utf8")) as State;
-
-function writeState(repo: TempRepo, steps: Record<string, Partial<StepState>>, more: Partial<State> = {}) {
-  const at = "2024-01-01T00:00:00.000Z";
-  const state = {
-    workflow: "design",
-    profile: "default",
-    checkout: repo.worktree,
-    ...more,
-    steps: Object.fromEntries(Object.entries(steps).map(([name, step]) => [name, { status: "done", at, ...step }])),
-  };
-  writeFileSync(join(repo.store("demo"), ".keylight.json"), JSON.stringify(state));
-}
-
-const documents = (repo: TempRepo) => `Documents: http://localhost:${repo.viewer.port}/view/demo-repo/demo\n`;
-const done = (...names: string[]) => Object.fromEntries(names.map((name) => [name, {}]));
-
-function writeWorkflows(repo: TempRepo, yaml: string) {
-  writeFileSync(join(repo.configDir, "workflows.yaml"), yaml);
-}
-
-function logs(repo: TempRepo): string[] {
-  const dir = join(repo.home, ".keylight/logs", repo.name, "demo");
-  return existsSync(dir) ? readdirSync(dir).map((name) => join(dir, name)) : [];
-}
 
 describe.serial("keylight run", () => {
   test("runs the steps in workflow order, each in its own session, and marks each done", async () => {
@@ -459,246 +421,6 @@ describe.serial("finishing a step", () => {
   });
 });
 
-describe.serial("an interactive step at a terminal", () => {
-  const PROCEED = ["Yes, proceed to the structure outline", "Yes, stop for now"];
-  const WITH_NOTE = [...PROCEED, "Yes, send a note to the next session", "No"];
-
-  function setUp(repo: TempRepo) {
-    writeState(repo, done("research-questions", "research"));
-  }
-
-  test("Enter or 1 counts the step done and starts the next; the last step asks only yes or no", async () => {
-    using repo = tempRepo({ tasks: ["demo"] });
-    using harness = fakeHarness();
-    setUp(repo);
-    harness.plan({
-      tdd: [{ write: { "03-tdd-demo.md": "" } }],
-      "structure-outline": [{ write: { "04-structure-outline-demo.md": "" } }],
-    });
-    using terminal = atTerminal(["", "1"]);
-
-    const result = await keylight("run", "--until", "structure-outline");
-    expect(result.code).toBe(0);
-    expect(terminal.questions).toEqual(["Is the technical design complete?", "Is the structure outline complete?"]);
-    expect(terminal.menus).toEqual([WITH_NOTE, ["Yes", "No"]]);
-    expect(harness.launches().map(stepOf)).toEqual(["tdd", "structure-outline"]);
-    expect(harness.launches()[1]?.argv[0]).toBe("/kl:create-structure-outline");
-    expect(plain(result.stdout)).toEndWith("\n\nStopped after structure-outline.\n");
-    expect(readState(repo).steps["structure-outline"]?.status).toBe("done");
-  });
-
-  test("2 counts the step done and stops before the next", async () => {
-    using repo = tempRepo({ tasks: ["demo"] });
-    using harness = fakeHarness();
-    setUp(repo);
-    harness.plan({ tdd: [{ write: { "03-tdd-demo.md": "" } }] });
-    using _terminal = atTerminal(["2"]);
-
-    const result = await keylight("run");
-    expect(result.code).toBe(0);
-    expect(plain(result.stdout)).toEndWith("\nStopped before structure-outline.\nNext:  keylight run\n");
-    expect(harness.launches().map(stepOf)).toEqual(["tdd"]);
-    expect(readState(repo).steps.tdd?.status).toBe("done");
-  });
-
-  test("No or ended input leaves the step open, and the next run resumes its session", async () => {
-    using repo = tempRepo({ tasks: ["demo"] });
-    using harness = fakeHarness();
-    setUp(repo);
-    harness.plan({ tdd: [{ write: { "03-tdd-demo.md": "" } }, {}] });
-    using _terminal = atTerminal(["4", null, "2"]);
-
-    const open = await keylight("run");
-    expect(open.code).toBe(0);
-    expect(plain(open.stdout)).toEndWith("\ntdd is left open.\nNext:  keylight run\n");
-    const id = valueAfter(harness.launches()[0] as Launch, "--session-id");
-    expect(readState(repo).steps.tdd).toMatchObject({ status: "started", harness: "claude", session: id });
-
-    const resumed = await keylight("run");
-    expect(banners(resumed.stdout)).toEqual(["▸ tdd  claude · interactive · resuming"]);
-    expect(harness.launches()[1]?.argv).toEqual(["--resume", id, "--add-dir", repo.store("demo")]);
-    expect(readState(repo).steps.tdd?.status).toBe("started");
-
-    await keylight("run");
-    expect(harness.launches()[2]?.argv).toEqual(["--resume", id, "--add-dir", repo.store("demo")]);
-    expect(readState(repo).steps.tdd).toMatchObject({ status: "done", session: id });
-  });
-
-  test("anything that is not one of the numbers is asked about again", async () => {
-    using repo = tempRepo({ tasks: ["demo"] });
-    using harness = fakeHarness();
-    setUp(repo);
-    harness.plan({ tdd: [{ write: { "03-tdd-demo.md": "" } }] });
-    using terminal = atTerminal(["y", "5", "0", "2"]);
-
-    const result = await keylight("run");
-    expect(result.code).toBe(0);
-    expect(terminal.questions).toHaveLength(4);
-    expect(result.stdout.split("\nType a number from 1 to 4.\n")).toHaveLength(4);
-    expect(readState(repo).steps.tdd?.status).toBe("done");
-  });
-
-  test("a step without a title is asked about by its name", async () => {
-    using repo = tempRepo({ tasks: ["demo"] });
-    using harness = fakeHarness();
-    writeWorkflows(
-      repo,
-      "workflows:\n  design: [first, second]\nsteps:\n" +
-        '  first: { skill: "kl:keylight", session: interactive }\n' +
-        '  second: { skill: "kl:keylight", session: interactive }\n',
-    );
-    using terminal = atTerminal(["2"]);
-
-    expect((await keylight("run")).code).toBe(0);
-    expect(terminal.questions).toEqual(["Is first complete?"]);
-    expect(terminal.menus[0]?.[0]).toBe("Yes, proceed to second");
-    expect(harness.launches().map(stepOf)).toEqual(["first"]);
-  });
-
-  test("a step with confirm: false continues without asking", async () => {
-    using repo = tempRepo({ tasks: ["demo"] });
-    using harness = fakeHarness();
-    setUp(repo);
-    writeWorkflows(repo, "steps:\n  tdd: { confirm: false }\n");
-    harness.plan({ tdd: [{ write: { "03-tdd-demo.md": "" } }] });
-    using terminal = atTerminal([]);
-
-    expect((await keylight("run", "--until", "tdd")).code).toBe(0);
-    expect(terminal.questions).toEqual([]);
-    expect(readState(repo).steps.tdd?.status).toBe("done");
-  });
-});
-
-describe.serial("a note for the next step", () => {
-  const NOTE = "A note from the user for this step: ";
-
-  function setUp(repo: TempRepo) {
-    writeState(repo, done("research-questions", "research"));
-  }
-
-  test("3 asks for a note, counts the step done and opens the next session with it", async () => {
-    using repo = tempRepo({ tasks: ["demo"] });
-    using harness = fakeHarness();
-    setUp(repo);
-    harness.plan({
-      tdd: [{ write: { "03-tdd-demo.md": "" } }],
-      "structure-outline": [{ write: { "04-structure-outline-demo.md": "" } }],
-    });
-    using terminal = atTerminal(["3", "No mocks in phase one", ""]);
-
-    const result = await keylight("run", "--until", "structure-outline");
-    expect(result.code).toBe(0);
-    expect(terminal.questions).toEqual([
-      "Is the technical design complete?",
-      "Note for the structure outline",
-      "Is the structure outline complete?",
-    ]);
-    expect(harness.launches()[1]?.argv[0]).toBe(`/kl:create-structure-outline\n\n${NOTE}No mocks in phase one`);
-    expect(plain(result.stdout)).toContain(
-      "\n▸ structure-outline  claude · interactive\n  note: No mocks in phase one\n",
-    );
-    expect(readState(repo)).toMatchObject({
-      notes: { "structure-outline": "No mocks in phase one" },
-      steps: { tdd: { status: "done" } },
-    });
-  });
-
-  test("a note skips a code step, waits for the session after it, and shows in status until that step is done", async () => {
-    using repo = tempRepo({ tasks: ["demo"] });
-    using harness = fakeHarness();
-    writeState(repo, done("research-questions", "research", "tdd"));
-    harness.plan({ "structure-outline": [{ write: { "04-structure-outline-demo.md": "" } }] });
-    using terminal = atTerminal(["3", "Run the review on every phase"]);
-
-    expect((await keylight("run", "--until", "worktree")).code).toBe(0);
-    expect(terminal.menus[0]?.[0]).toBe("Yes, proceed to the worktree");
-    expect(terminal.questions[1]).toBe("Note for the implementation");
-    expect(readState(repo).notes).toEqual({ "implement-outline": "Run the review on every phase" });
-    const pending = plain((await keylight("status")).stdout);
-    expect(pending).toContain(
-      "\n  ▸ implement-outline   claude · interactive\n    note: Run the review on every phase\n",
-    );
-
-    const state = readState(repo);
-    state.steps["implement-outline"] = { status: "done", at: "2024-01-01T00:00:00.000Z" };
-    writeFileSync(join(repo.store("demo"), ".keylight.json"), JSON.stringify(state));
-    expect(plain((await keylight("status")).stdout)).not.toContain("note:");
-  });
-
-  test("an empty note returns to the question, and input that ends there leaves the step open", async () => {
-    using repo = tempRepo({ tasks: ["demo"] });
-    using harness = fakeHarness();
-    setUp(repo);
-    harness.plan({ tdd: [{ write: { "03-tdd-demo.md": "" } }, {}] });
-    using terminal = atTerminal(["3", "", "3", null, "2"]);
-
-    expect(plain((await keylight("run")).stdout)).toEndWith("\ntdd is left open.\nNext:  keylight run\n");
-    expect(terminal.questions).toEqual([
-      "Is the technical design complete?",
-      "Note for the structure outline",
-      "Is the technical design complete?",
-      "Note for the structure outline",
-    ]);
-    expect(plain((await keylight("run")).stdout)).toEndWith(
-      "\nStopped before structure-outline.\nNext:  keylight run\n",
-    );
-    expect(readState(repo).notes).toBeUndefined();
-  });
-
-  test("no note is offered for a step that will continue its session", async () => {
-    using repo = tempRepo({ tasks: ["demo"] });
-    using harness = fakeHarness();
-    writeState(repo, {
-      ...done("research-questions", "research"),
-      "structure-outline": { status: "started", harness: "claude", session: "outline-session" },
-    });
-    harness.plan({ tdd: [{ write: { "03-tdd-demo.md": "" } }] });
-    using terminal = atTerminal(["3"]);
-
-    expect(plain((await keylight("run")).stdout)).toEndWith("\ntdd is left open.\nNext:  keylight run\n");
-    expect(terminal.menus).toEqual([["Yes, proceed to the structure outline", "Yes, stop for now", "No"]]);
-  });
-
-  test("--note reaches the first new session of the run, and a dry run keeps nothing", async () => {
-    using repo = tempRepo({ tasks: ["demo"] });
-    using harness = fakeHarness();
-    setUp(repo);
-    harness.plan({ tdd: [{ write: { "03-tdd-demo.md": "" } }] });
-
-    const dry = await keylight("run", "--note", "Use the retry design", "--until", "tdd", "--dry-run");
-    expect(dry.stdout).toContain(`${NOTE}Use the retry design`);
-    expect(readState(repo).notes).toBeUndefined();
-
-    expect((await keylight("run", "--note", "Use the retry design", "--until", "tdd")).code).toBe(0);
-    expect(harness.launches()[0]?.argv[0]).toBe(`/kl:create-tdd\n\n${NOTE}Use the retry design`);
-    expect(readState(repo).notes).toEqual({ tdd: "Use the retry design" });
-  });
-
-  test("--note is refused when the run starts no new session", async () => {
-    using repo = tempRepo({ tasks: ["demo"] });
-    using harness = fakeHarness();
-    writeState(repo, {
-      ...done("research-questions", "research"),
-      tdd: { status: "started", harness: "claude", session: "tdd-session" },
-    });
-
-    expect(await keylight("run", "--note", "Mind the cache")).toEqual({
-      code: 1,
-      stdout: documents(repo),
-      stderr:
-        "keylight: tdd continues its session, which takes no opening message: " +
-        "type the note there, or add --fresh to start tdd over\n",
-    });
-    expect(await keylight("run", "--note", "Mind the cache", "--from", "worktree", "--until", "worktree")).toEqual({
-      code: 1,
-      stdout: documents(repo),
-      stderr: "keylight: --note needs a step that starts a session, and this run has none\n",
-    });
-    expect(harness.launches()).toEqual([]);
-    expect(readState(repo).notes).toBeUndefined();
-  });
-});
-
 describe.serial("going back to a step", () => {
   test("--from continues a finished interactive step's session; --fresh starts a new one", async () => {
     using repo = tempRepo({ tasks: ["demo"] });
@@ -924,11 +646,107 @@ describe.serial("profiles", () => {
     expect((await keylight("run", "--profile", "nope")).stderr).toBe(
       'keylight: no profile named "nope". Known: default\n',
     );
+    expect(existsSync(join(repo.store("demo"), ".keylight.json"))).toBe(false);
     writeWorkflows(repo, "profiles:\n  default:\n    research: { harness: gemini }\n");
     writeState(repo, done("research-questions"));
     expect((await keylight("run")).stderr).toBe(
       'keylight: profile "default", step "research": harness must be claude or codex, not "gemini"\n',
     );
+  });
+});
+
+describe.serial("a task whose profile has gone from the settings", () => {
+  const GONE = 'no profile named "old". Known: default';
+  const FIX = "Next:  keylight run --profile default";
+
+  test("run names the command that records another profile, and that command continues the task", async () => {
+    using repo = tempRepo({ tasks: ["demo"] });
+    using harness = fakeHarness();
+    writeState(repo, done("research-questions"), { profile: "old" });
+    harness.plan({ research: [{ replay: HEADLESS, write: { "02-research-demo.md": "" } }] });
+
+    expect(await keylight("run", "--until", "research")).toEqual({
+      code: 1,
+      stdout: documents(repo),
+      stderr: `keylight: ${GONE}\n${FIX}\n`,
+    });
+    expect(harness.launches()).toEqual([]);
+
+    expect((await keylight("run", "--profile", "default", "--until", "research")).code).toBe(0);
+    expect(harness.launches().map(stepOf)).toEqual(["research"]);
+    expect(readState(repo).profile).toBe("default");
+  });
+
+  test("a profile name the settings do not define is never recorded over the task's own", async () => {
+    using repo = tempRepo({ tasks: ["demo"] });
+    using _harness = fakeHarness();
+    writeState(repo, done("research-questions"));
+
+    expect((await keylight("run", "--profile", "nope")).stderr).toBe(
+      'keylight: no profile named "nope". Known: default\n',
+    );
+    expect(readState(repo).profile).toBe("default");
+  });
+
+  test("a task with every step done still says so", async () => {
+    using repo = tempRepo({ tasks: ["demo"] });
+    writeState(repo, done(...DESIGN), { profile: "old" });
+
+    expect(await keylight("run")).toEqual({
+      code: 0,
+      stdout: `${documents(repo)}Every step of design is done for demo.\n`,
+      stderr: "",
+    });
+  });
+
+  test("status shows every step, leaves the launch of unstarted ones blank and names the fix once", async () => {
+    using repo = tempRepo({ tasks: ["demo"] });
+    writeFileSync(join(repo.store("demo"), "01-research-questions-demo.md"), "");
+    writeState(repo, done("research-questions"), { profile: "old" });
+
+    expect(await keylight("status")).toEqual({
+      code: 0,
+      stdout: [
+        "task      demo",
+        "workflow  design  (profile old)",
+        "  ✓ research-questions  01-research-questions-demo.md",
+        "  ▸ research            ",
+        "  · tdd                 ",
+        "  · structure-outline   ",
+        "  · worktree            code",
+        "  · implement-outline   ",
+        "  · pr                  ",
+        "store     ../artifacts/demo-repo/demo",
+        GONE,
+        FIX,
+        "",
+      ].join("\n"),
+      stderr: "",
+    });
+  });
+
+  test("status reports a harness the settings name wrongly for each step it affects", async () => {
+    using repo = tempRepo({ tasks: ["demo"] });
+    writeWorkflows(repo, "profiles:\n  default:\n    review: { harness: gemini }\n");
+    writeFileSync(join(repo.store("demo"), "03-decisions-demo.md"), "## ✅ Phase 1: a\n");
+    writeState(repo, done("grill", "worktree", "implement-decisions"), { workflow: "direct" });
+
+    expect(await keylight("status")).toEqual({
+      code: 0,
+      stdout: [
+        "task      demo",
+        "workflow  direct  (profile default)",
+        "  ✓ grill                03-decisions-demo.md",
+        "  ✓ worktree             ",
+        "  ✓ implement-decisions  03-decisions-demo.md  1/1 phases",
+        "  ▸ review               ",
+        "  · pr                   claude · headless",
+        "store     ../artifacts/demo-repo/demo",
+        'profile "default", step "review": harness must be claude or codex, not "gemini"',
+        "",
+      ].join("\n"),
+      stderr: "",
+    });
   });
 });
 
