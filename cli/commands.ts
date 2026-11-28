@@ -29,6 +29,7 @@ const VALUE_FLAGS = new Set([
   "--name",
   "--from",
   "--until",
+  "--note",
 ]);
 
 interface Invocation {
@@ -99,6 +100,7 @@ const RUN_USAGE = [
   "keylight run                       continue the task's workflow from its first unfinished step",
   "       [--from STEP] [--until STEP] [--fresh] [--dry-run] [--workflow NAME] [--profile NAME]",
   "       --from goes back to a step and continues its session; --fresh starts that step over",
+  '       [--note "TEXT"]             something for the first new session to take into account',
   "keylight status                    the task's steps and how far they are",
   "keylight worktree                  create the task's worktree and link the task into it",
   "keylight gate <step> <gate>        print the prompt for a point inside a step",
@@ -135,6 +137,7 @@ function runOptions({ argv, named }: Invocation): RunOptions {
     until: flag(argv, "until"),
     dryRun: argv.includes("--dry-run"),
     fresh: argv.includes("--fresh"),
+    note: flag(argv, "note"),
   };
 }
 

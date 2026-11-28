@@ -38,6 +38,29 @@ describe("ask", () => {
   });
 });
 
+describe("choose", () => {
+  /** Evaluates `call`, an expression using `ask` or `choose`, in a process whose standard input holds `input`. */
+  async function sayWith(call: string, input: string): Promise<string> {
+    const script = `
+      import { ask, choose } from ${JSON.stringify(SAY)};
+      console.log("\\n" + JSON.stringify(${call}));
+    `;
+    const child = Bun.spawn([process.execPath, "-e", script], { stdin: new Blob([input]), stdout: "pipe" });
+    const [stdout] = await Promise.all([new Response(child.stdout).text(), child.exited]);
+    return stdout;
+  }
+
+  test("numbers the answers under the question and returns what was typed", async () => {
+    expect(await sayWith('choose("Is the review complete?", ["Yes", "No"])', " 2 \n")).toBe(
+      'Is the review complete?\n(1) Yes\n(2) No\nChoose 1-2 [1]: \n"2"\n',
+    );
+  });
+
+  test("a question without choices is its text and a colon", async () => {
+    expect(await sayWith('ask("Note for the review")', "be brief\n")).toBe('Note for the review: \n"be brief"\n');
+  });
+});
+
 describe("nextLine", () => {
   test("labels the command to run next", () => {
     expect(nextLine("keylight run")).toBe("Next:  keylight run");

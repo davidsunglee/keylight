@@ -230,22 +230,26 @@ export function fakeHarness(): FakeHarness {
 }
 
 /** Every stream reports a terminal, and each question takes the next of `answers`. */
-export function atTerminal(answers: (string | null)[] = []): Disposable & { questions: string[] } {
+export function atTerminal(answers: (string | null)[] = []): Disposable & { questions: string[]; menus: string[][] } {
   const streams = [process.stdin, process.stdout, process.stderr];
   const saved = {
     isTTY: streams.map((stream) => stream.isTTY),
     answers: terminal.answers,
     questions: terminal.questions,
+    menus: terminal.menus,
   };
   for (const stream of streams) Object.assign(stream, { isTTY: true });
   terminal.answers = [...answers];
   terminal.questions = [];
+  terminal.menus = [];
   return {
     questions: terminal.questions,
+    menus: terminal.menus,
     [Symbol.dispose]: () => {
       for (const [i, stream] of streams.entries()) Object.assign(stream, { isTTY: saved.isTTY[i] });
       terminal.answers = saved.answers;
       terminal.questions = saved.questions;
+      terminal.menus = saved.menus;
     },
   };
 }

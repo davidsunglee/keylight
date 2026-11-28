@@ -52,6 +52,8 @@ export const terminal = {
   answers: [] as (string | null)[],
   /** Questions asked so far, answered or not. */
   questions: [] as string[],
+  /** The numbered answers of each menu shown so far. */
+  menus: [] as string[][],
 };
 
 for (const stream of [process.stdin, process.stdout, process.stderr]) Object.assign(stream, { isTTY: false });
@@ -68,12 +70,17 @@ const homedir = () => home.path;
 mock.module("node:os", () => ({ ...actualOs, default: { ...actualOs, homedir }, homedir }));
 
 const actual = { ...say };
+function scripted(question: string): string | null {
+  terminal.questions.push(question);
+  const answer = terminal.answers.shift();
+  if (answer === undefined) throw new Error(`unexpected prompt: ${question}`);
+  return answer;
+}
 mock.module("../say", () => ({
   ...actual,
-  ask(question: string): string | null {
-    terminal.questions.push(question);
-    const answer = terminal.answers.shift();
-    if (answer === undefined) throw new Error(`unexpected prompt: ${question}`);
-    return answer;
+  ask: scripted,
+  choose(question: string, options: string[]): string | null {
+    terminal.menus.push(options);
+    return scripted(question);
   },
 }));

@@ -13,7 +13,7 @@ import { homedir } from "node:os";
 import { join, relative } from "node:path";
 import type { Config } from "./config";
 import { HARNESSES, type Harness, type Problem, type Session, type SessionRequest } from "./harness";
-import { ask, nextLine } from "./say";
+import { ask, choose, nextLine } from "./say";
 import { currentRepo, currentTask, LINK_DIR, type Repo, storeOf, TaskError } from "./task";
 import {
   ConfigError,
@@ -46,6 +46,8 @@ export interface State {
   /** Commit the implementation started from. */
   base?: string;
   steps: Record<string, StepState>;
+  /** What the user wants a step to take into account, by step: part of the opening message of each new session. */
+  notes?: Record<string, string>;
 }
 
 export interface RunOptions {
@@ -57,6 +59,8 @@ export interface RunOptions {
   dryRun?: boolean;
   /** Start the first step in a new session even when it has one to resume. */
   fresh?: boolean;
+  /** A note for the first session the run starts. */
+  note?: string;
 }
 
 const STATE_FILE = ".keylight.json";
@@ -165,11 +169,13 @@ function openingMessage(
   cwd: string,
   config: Config,
   values: Record<string, string>,
+  note: string | undefined,
 ): string {
   const parts = [harness.skillInvocation(step.skill!)];
   if (step.prompt) parts.push(fill(step.prompt.trim(), values));
   const added = promptFile(name, cwd, config);
   if (added) parts.push(added);
+  if (note) parts.push(`A note from the user for this step: ${note}`);
   if (step.session === "headless") parts.push(UNATTENDED);
   return parts.join("\n\n");
 }
@@ -259,20 +265,67 @@ function markStep(ctx: RunContext, name: string, status: StepState["status"], mo
  * A document on disk does not prove an interactive step is finished: its skill
  * writes a skeleton first. Only the person who quit the session knows.
  */
-function askFinished(name: string, following: string | undefined): "done" | "done-stop" | "open" {
-  console.log();
-  const answer = following
-    ? ask(`Is ${name} finished?`, [
-        ["Enter", `yes, start ${following}`],
-        ["s", "yes, stop here"],
-        ["n", "not yet"],
-      ])
-    : ask(`Is ${name} finished?`, [
-        ["Enter", "yes"],
-        ["n", "not yet"],
-      ]);
-  if (answer === null || answer.toLowerCase().startsWith("n")) return "open";
-  return following && answer.toLowerCase().startsWith("s") ? "done-stop" : "done";
+function askFinished(
+  name: string,
+  following: string | undefined,
+  noteFor: string | undefined,
+  ctx: RunContext,
+): Answer {
+  const title = (step: string) => ctx.workflows.steps[step]?.title ?? step;
+  const options = finishedOptions(following && title(following), noteFor !== undefined);
+  const labels = options.map(([label]) => label);
+  for (;;) {
+    console.log();
+    const typed = choose(`Is ${title(name)} complete?`, labels);
+    if (typed === null) return { outcome: "open" };
+    const answer = answerTo(typed, options, noteFor && title(noteFor));
+    if (answer) return answer;
+  }
+}
+
+/** What a typed line settles, or null when the question has to be asked again. */
+function answerTo(typed: string, options: [label: string, meaning: Meaning][], noteTitle: string | undefined) {
+  const picked = /^\d*$/.test(typed) ? options[Number(typed || 1) - 1]?.[1] : undefined;
+  if (!picked) {
+    console.log(`Type a number from 1 to ${options.length}.`);
+    return null;
+  }
+  if (picked !== "note") return { outcome: picked } satisfies Answer;
+  const note = ask(`Note for ${noteTitle}`);
+  if (note === null) return { outcome: "open" } satisfies Answer;
+  // An empty note is a change of mind: back to the question.
+  return note ? ({ outcome: "done", note } satisfies Answer) : null;
+}
+
+type Meaning = Answer["outcome"] | "note";
+
+/** The answers to whether a step is complete, in the order they are numbered. `following` is the next step's title. */
+function finishedOptions(following: string | undefined, takesNote: boolean): [label: string, meaning: Meaning][] {
+  if (!following)
+    return [
+      ["Yes", "done"],
+      ["No", "open"],
+    ];
+  const note: [string, Meaning][] = takesNote ? [["Yes, send a note to the next session", "note"]] : [];
+  return [[`Yes, proceed to ${following}`, "done"], ["Yes, stop for now", "done-stop"], ...note, ["No", "open"]];
+}
+
+interface Answer {
+  outcome: "done" | "done-stop" | "open";
+  note?: string;
+}
+
+/** The step a note given after `name` would reach: the next one that opens a new session. */
+function noteTarget(name: string, ctx: RunContext): string | undefined {
+  const steps = workflowNamed(ctx.workflows, ctx.state.workflow);
+  const target = steps.slice(steps.indexOf(name) + 1).find((later) => ctx.workflows.steps[later]?.skill);
+  if (!target) return undefined;
+  const launch = launchFor(ctx.workflows, ctx.state.profile, target);
+  return resumedSession(target, ctx.workflows.steps[target]!, launch, ctx, "resume") ? undefined : target;
+}
+
+function keepNote(ctx: RunContext, step: string, note: string) {
+  ctx.state.notes = { ...ctx.state.notes, [step]: note };
 }
 
 function runWorktreeStep(name: string, ctx: RunContext, dryRun: boolean): Outcome {
@@ -311,7 +364,8 @@ function sessionRequest(name: string, step: Step, launch: Launch, cwd: string, c
     skills: SKILLS_DIR,
   };
   const harness = HARNESSES[launch.harness];
-  const message = openingMessage(name, step, harness, existsSync(cwd) ? cwd : state.checkout, ctx.config, values);
+  const note = state.notes?.[name];
+  const message = openingMessage(name, step, harness, existsSync(cwd) ? cwd : state.checkout, ctx.config, values, note);
   const resume = resumedSession(name, step, launch, ctx, entry);
   return { name, step, launch, message, task: ctx.task, store: ctx.store, resume } satisfies SessionRequest;
 }
@@ -328,11 +382,13 @@ function concludeStep(name: string, step: Step, ctx: RunContext, cwd: string, ne
   const problem = unmet(step, ctx, cwd);
   if (problem) return { problem };
   const asks = step.session === "interactive" && step.confirm !== false && process.stdin.isTTY;
-  const answer = asks ? askFinished(name, next) : "done";
+  const noteFor = next && noteTarget(name, ctx);
+  const answer: Answer = asks ? askFinished(name, next, noteFor || undefined, ctx) : { outcome: "done" };
   // Left as started, so the next run resumes this session instead of moving on.
-  if (answer === "open") return "open";
+  if (answer.outcome === "open") return "open";
+  if (answer.note && noteFor) keepNote(ctx, noteFor, answer.note);
   markStep(ctx, name, "done");
-  return answer;
+  return answer.outcome;
 }
 
 async function runStep(name: string, ctx: RunContext, run: StepRun): Promise<Outcome> {
@@ -350,6 +406,8 @@ async function runStep(name: string, ctx: RunContext, run: StepRun): Promise<Out
   const settings = harness.subagentEnv(launch);
 
   console.log(`\n${bold(`▸ ${name}`)}  ${dim(sessionLabel(step, launch) + (request.resume ? " · resuming" : ""))}`);
+  const note = ctx.state.notes?.[name];
+  if (note && !request.resume) console.log(dim(`  note: ${note}`));
   if (run.dryRun) {
     printDryRun(cwd, settings, session);
     return "done";
@@ -447,6 +505,20 @@ function reportStop(step: string, outcome: Exclude<Outcome, "done">, next: strin
   return 1;
 }
 
+/** Keeps --note for the first session the run starts, which must be a new one: a resumed session takes no opening message. */
+function takeNote(ctx: RunContext, range: StepRange, options: RunOptions) {
+  const index = range.steps.findIndex((name) => ctx.workflows.steps[name]?.skill);
+  const name = range.steps[index];
+  if (name === undefined) throw new TaskError("--note needs a step that starts a session, and this run has none");
+  const launch = launchFor(ctx.workflows, ctx.state.profile, name);
+  if (resumedSession(name, ctx.workflows.steps[name]!, launch, ctx, entryMode(index === 0, options)))
+    throw new TaskError(
+      `${name} continues its session, which takes no opening message: type the note there, or add --fresh to start ${name} over`,
+    );
+  keepNote(ctx, name, options.note!);
+  if (!options.dryRun) writeState(ctx.store, ctx.state);
+}
+
 export async function runWorkflow(config: Config, workflows: Workflows, options: RunOptions): Promise<number> {
   const ctx = runContext(config, workflows, options);
   const range = stepRange(ctx, options);
@@ -454,6 +526,7 @@ export async function runWorkflow(config: Config, workflows: Workflows, options:
     console.log(`Every step of ${ctx.state.workflow} is done for ${ctx.task}.`);
     return 0;
   }
+  if (options.note) takeNote(ctx, range, options);
   console.log(`${bold(ctx.task)}  ${dim(`${ctx.state.workflow} workflow · ${ctx.state.profile} profile`)}`);
   for (const [index, name] of range.steps.entries()) {
     reloadWorkflows(ctx, name);
@@ -480,19 +553,24 @@ function documentNote(step: Step, store: string, workflows: Workflows): string {
   return total ? `${doc}  ${done}/${total} phases` : doc;
 }
 
+/** What a step's status line says after its name: its document once it has started, how it will launch before. */
+function stepSummary(name: string, state: State, store: string, workflows: Workflows): string {
+  const step = workflows.steps[name]!;
+  if (state.steps[name]?.status) return documentNote(step, store, workflows);
+  return dim(step.run ? "code" : sessionLabel(step, launchFor(workflows, state.profile, name)));
+}
+
 function printSteps(state: State, store: string, workflows: Workflows) {
   const steps = workflowNamed(workflows, state.workflow);
   const width = Math.max(...steps.map((name) => name.length));
   let nextShown = false;
   for (const name of steps) {
-    const step = workflows.steps[name]!;
     const status = state.steps[name]?.status;
     const symbol = status === "done" ? "✓" : status === "started" || !nextShown ? "▸" : "·";
     if (status !== "done") nextShown = true;
-    const note = status
-      ? documentNote(step, store, workflows)
-      : dim(step.run ? "code" : sessionLabel(step, launchFor(workflows, state.profile, name)));
-    console.log(`  ${symbol} ${name.padEnd(width)}  ${note}`);
+    console.log(`  ${symbol} ${name.padEnd(width)}  ${stepSummary(name, state, store, workflows)}`);
+    const note = status === "done" ? undefined : state.notes?.[name];
+    if (note) console.log(dim(`    note: ${note}`));
   }
 }
 
